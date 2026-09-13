@@ -109,75 +109,69 @@ export function ViewToolbar({
           onClick={() => filterPop.setOpen((v) => !v)}
         />
         {filterPop.open && (
-          <div className="absolute left-0 top-full z-30 mt-1 w-[320px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-raised)] p-3 shadow-[var(--shadow-lg)]">
+          // No fixed width — an absolutely-positioned box with none sizes
+          // itself to its content (shrink-to-fit), so the popover simply
+          // grows to whatever the widest condition row actually needs
+          // (e.g. a long choice name in the value select) instead of the
+          // row's controls having to divide up a width decided in advance.
+          // min-w keeps it from looking cramped when empty; max-w is just a
+          // sanity cap so one absurdly long value can't run off-screen.
+          <div className="absolute left-0 top-full z-30 mt-1 min-w-[300px] max-w-[640px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-raised)] p-3 shadow-[var(--shadow-lg)]">
             {conditions.length === 0 && (
               <p className="mb-2 text-[12.5px] text-[var(--color-fg-subtle)]">No filters applied to this view.</p>
             )}
-            <div className="space-y-2.5">
+            <div className="space-y-2">
               {conditions.map((cond, idx) => {
                 const field = fieldById(cond.fieldId);
                 if (!field) return null;
                 const ops = OPS_BY_FIELD_TYPE[field.type];
                 return (
-                  // Two lines per condition, not one — cramming field select +
-                  // operator select + value editor + delete button onto a
-                  // single row meant their widths had to sum to *exactly* the
-                  // popover's width with zero slack, and any content just a
-                  // few px wider than expected (a longer field/operator name,
-                  // a wider value control) pushed the delete button out past
-                  // the popover's edge instead of fitting inside it. Splitting
-                  // the value editor onto its own full-width line removes that
-                  // squeeze entirely, regardless of how wide any label gets.
-                  <div key={idx} className="space-y-1.5">
-                    <div className="flex items-center gap-1.5">
-                      <span className="w-10 shrink-0 text-[12px] text-[var(--color-fg-subtle)]">
-                        {idx === 0 ? "Where" : filterGroup.conjunction === "and" ? "and" : "or"}
-                      </span>
-                      <Select
-                        className="min-w-0 flex-1"
-                        value={field.id}
-                        onChange={(v) => {
-                          const nf = fieldById(v)!;
-                          const nextOps = OPS_BY_FIELD_TYPE[nf.type];
+                  // Each control below sizes to its own content (no width or
+                  // flex-1 forced on it) — see the popover comment above for
+                  // why: a fixed/flex budget that has to add up exactly is
+                  // what pushed the delete button outside the box before.
+                  <div key={idx} className="flex items-center gap-1.5 whitespace-nowrap">
+                    <span className="shrink-0 text-[12px] text-[var(--color-fg-subtle)]">
+                      {idx === 0 ? "Where" : filterGroup.conjunction === "and" ? "and" : "or"}
+                    </span>
+                    <Select
+                      value={field.id}
+                      onChange={(v) => {
+                        const nf = fieldById(v)!;
+                        const nextOps = OPS_BY_FIELD_TYPE[nf.type];
+                        const next = [...conditions];
+                        next[idx] = { fieldId: v, op: nextOps[0], value: undefined };
+                        setConditions(next);
+                      }}
+                      options={fields.map((f) => ({ value: f.id, label: f.name }))}
+                    />
+                    <Select
+                      value={cond.op}
+                      onChange={(v) => {
+                        const next = [...conditions];
+                        next[idx] = { ...cond, op: v as FilterOp, value: undefined };
+                        setConditions(next);
+                      }}
+                      options={ops.map((op) => ({ value: op, label: OP_LABELS[op] }))}
+                    />
+                    {!NO_VALUE_OPS.has(cond.op) && (
+                      <FilterValueInput
+                        field={field}
+                        op={cond.op}
+                        value={cond.value}
+                        onChange={(value) => {
                           const next = [...conditions];
-                          next[idx] = { fieldId: v, op: nextOps[0], value: undefined };
+                          next[idx] = { ...cond, value };
                           setConditions(next);
                         }}
-                        options={fields.map((f) => ({ value: f.id, label: f.name }))}
                       />
-                      <button
-                        onClick={() => setConditions(conditions.filter((_, i) => i !== idx))}
-                        className="shrink-0 rounded p-1 text-[var(--color-fg-subtle)] hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)]"
-                      >
-                        <TrashIcon width={13} height={13} />
-                      </button>
-                    </div>
-                    <div className="flex items-center gap-1.5 pl-11">
-                      <Select
-                        className="min-w-0 flex-1"
-                        value={cond.op}
-                        onChange={(v) => {
-                          const next = [...conditions];
-                          next[idx] = { ...cond, op: v as FilterOp, value: undefined };
-                          setConditions(next);
-                        }}
-                        options={ops.map((op) => ({ value: op, label: OP_LABELS[op] }))}
-                      />
-                      {!NO_VALUE_OPS.has(cond.op) && (
-                        <div className="min-w-0 flex-1">
-                          <FilterValueInput
-                            field={field}
-                            op={cond.op}
-                            value={cond.value}
-                            onChange={(value) => {
-                              const next = [...conditions];
-                              next[idx] = { ...cond, value };
-                              setConditions(next);
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
+                    )}
+                    <button
+                      onClick={() => setConditions(conditions.filter((_, i) => i !== idx))}
+                      className="ml-auto shrink-0 rounded p-1 text-[var(--color-fg-subtle)] hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)]"
+                    >
+                      <TrashIcon width={13} height={13} />
+                    </button>
                   </div>
                 );
               })}

@@ -30,8 +30,11 @@ export function FilterValueInput({
   if (type === "singleSelect") {
     const choices = (field.options.choices as Choice[]) ?? [];
     return (
+      // No width class: sizes to the selected choice's own label (see the
+      // popover's shrink-to-fit comment in view-toolbar.tsx) instead of
+      // wrapping/clipping a long choice name inside a box sized for a
+      // short one.
       <Select
-        className="w-full"
         value={(value as string) ?? ""}
         onChange={onChange}
         placeholder="Choose…"
@@ -52,7 +55,7 @@ export function FilterValueInput({
       return <span className="text-[12px] text-[var(--color-fg-subtle)]">No options to choose from yet</span>;
     }
     return (
-      <div className="flex w-full flex-wrap gap-1">
+      <div className="flex max-w-[280px] flex-wrap gap-1">
         {choices.map((c) => (
           <button
             key={c.id}
@@ -74,7 +77,7 @@ export function FilterValueInput({
         type="number"
         value={(value as number) ?? ""}
         onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))}
-        className="w-full min-w-0 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-[12.5px] outline-none focus:border-[var(--color-accent)]"
+        className="w-24 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-[12.5px] outline-none focus:border-[var(--color-accent)]"
       />
     );
   }
@@ -85,7 +88,7 @@ export function FilterValueInput({
         type={type === "dateTime" ? "datetime-local" : "date"}
         value={(value as string) ?? ""}
         onChange={(e) => onChange(e.target.value || undefined)}
-        className="w-full min-w-0 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-[12.5px] outline-none focus:border-[var(--color-accent)]"
+        className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-[12.5px] outline-none focus:border-[var(--color-accent)]"
       />
     );
   }
@@ -96,7 +99,7 @@ export function FilterValueInput({
       value={(value as string) ?? ""}
       onChange={(e) => onChange(e.target.value || undefined)}
       placeholder="Value"
-      className="w-full min-w-0 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-[12.5px] outline-none focus:border-[var(--color-accent)]"
+      className="w-40 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-[12.5px] outline-none focus:border-[var(--color-accent)]"
     />
   );
 }
