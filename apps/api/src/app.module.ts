@@ -11,6 +11,8 @@ import { FieldsModule } from "./fields/fields.module";
 import { ViewsModule } from "./views/views.module";
 import { RecordsModule } from "./records/records.module";
 import { CsvModule } from "./csv/csv.module";
+import { InterfacesModule } from "./interfaces/interfaces.module";
+import { PublicModule } from "./public/public.module";
 import { RequestLoggerMiddleware } from "./common/middleware/request-logger.middleware";
 
 @Module({
@@ -26,6 +28,8 @@ import { RequestLoggerMiddleware } from "./common/middleware/request-logger.midd
     ViewsModule,
     RecordsModule,
     CsvModule,
+    InterfacesModule,
+    PublicModule,
   ],
   providers: [{ provide: APP_GUARD, useClass: ThrottlerGuard }],
 })

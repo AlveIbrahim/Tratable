@@ -44,6 +44,7 @@ export const dashboardWidgetSchema = z.object({
   groupByFieldId: z.string().optional(),
   filters: filterNodeSchema.optional(),
 });
+export type DashboardWidget = z.infer<typeof dashboardWidgetSchema>;
 
 export const dashboardPageConfigSchema = z.object({
   ...basePageFields,

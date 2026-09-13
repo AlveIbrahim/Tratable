@@ -47,7 +47,10 @@ export class RecordsService {
     return clean;
   }
 
-  async create(tableId: string, userId: string, dto: CreateRecordDto) {
+  /** userId is nullable for the one caller outside the authenticated API:
+   * an anonymous public form submission (public.service.ts) has no user to
+   * attribute the write to. */
+  async create(tableId: string, userId: string | null, dto: CreateRecordDto) {
     const fields = await this.getFields(tableId);
     const clean = this.validate(fields, dto.data);
 
