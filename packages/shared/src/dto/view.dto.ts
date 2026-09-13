@@ -25,9 +25,20 @@ export const createViewSchema = z.object({
 });
 export type CreateViewDto = z.infer<typeof createViewSchema>;
 
+/** Same shape as `viewConfigSchema.partial()`, but the fields that mean
+ * "unset this" (no filter, no grouping, no color) additionally accept an
+ * explicit `null` — the signal a patch uses to *clear* a key rather than
+ * merely omit it (see ViewConfigPatch in apps/web's use-views.ts for why
+ * `undefined` can't carry that meaning once it crosses JSON). */
+const viewConfigPatchSchema = viewConfigSchema.partial().extend({
+  filters: filterNodeSchema.nullable().optional(),
+  groupByFieldId: z.string().nullable().optional(),
+  colorFieldId: z.string().nullable().optional(),
+});
+
 export const updateViewSchema = z.object({
   name: z.string().min(1).max(120).optional(),
-  config: viewConfigSchema.partial().optional(),
+  config: viewConfigPatchSchema.optional(),
   pos: z.number().optional(),
 });
 export type UpdateViewDto = z.infer<typeof updateViewSchema>;

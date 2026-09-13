@@ -62,13 +62,18 @@ export function Select({
         onClick={() => setOpen((v) => !v)}
         className="flex w-full items-center justify-between gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-2 text-left text-[13px] outline-none transition-colors focus:border-[var(--color-accent)]"
       >
-        <span className={selected ? "" : "text-[var(--color-fg-subtle)]"}>
+        <span className={`truncate ${selected ? "" : "text-[var(--color-fg-subtle)]"}`}>
           {selected?.label ?? placeholder ?? "Select…"}
         </span>
         <ChevronDownIcon width={13} height={13} className="shrink-0 text-[var(--color-fg-subtle)]" />
       </button>
       {open && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-auto rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-raised)] py-1 shadow-[var(--shadow-lg)]">
+        // min-w-full (never narrower than the trigger) + w-max (grows to fit
+        // its longest option) + a max-width cap + no-wrap: a long option like
+        // "Christchurch, New Zealand" gets its own line at full width instead
+        // of wrapping into a multi-line button inside a box sized for the
+        // trigger's own (often much shorter) width.
+        <div className="absolute left-0 top-full z-30 mt-1 max-h-60 w-max min-w-full max-w-[280px] overflow-auto rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-raised)] py-1 shadow-[var(--shadow-lg)]">
           {options.map((opt) => (
             <button
               key={opt.value}
@@ -77,7 +82,7 @@ export function Select({
                 onChange(opt.value);
                 setOpen(false);
               }}
-              className={`block w-full px-2.5 py-1.5 text-left text-[13px] hover:bg-[var(--color-surface-hover)] ${
+              className={`block w-full whitespace-nowrap px-2.5 py-1.5 text-left text-[13px] hover:bg-[var(--color-surface-hover)] ${
                 opt.value === value ? "bg-[var(--color-accent-soft)] font-medium text-[var(--color-accent)]" : ""
               }`}
             >

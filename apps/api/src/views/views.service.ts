@@ -42,7 +42,16 @@ export class ViewsService {
     if (dto.name !== undefined) patch.name = dto.name;
     if (dto.pos !== undefined) patch.pos = dto.pos;
     if (dto.config !== undefined) {
-      patch.config = JSON.stringify({ ...(view.config as object), ...dto.config });
+      // A key sent as `null` means "clear this" (see viewConfigPatchSchema) —
+      // delete it from the merged config rather than storing a literal null,
+      // so e.g. "Group by: None" actually removes groupByFieldId instead of
+      // leaving a null that every reader would have to special-case.
+      const merged: Record<string, unknown> = { ...(view.config as object) };
+      for (const [key, value] of Object.entries(dto.config)) {
+        if (value === null) delete merged[key];
+        else merged[key] = value;
+      }
+      patch.config = JSON.stringify(merged);
     }
     await this.db.db.updateTable("views").set(patch).where("id", "=", id).execute();
     return this.getOrThrow(id);

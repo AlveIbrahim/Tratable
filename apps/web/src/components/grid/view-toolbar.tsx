@@ -4,11 +4,18 @@ import { useEffect, useRef, useState } from "react";
 import type { FilterCondition, FilterOp, SortSpec } from "@tratable/shared";
 import { isFilterGroup } from "@tratable/shared";
 import type { FieldSummary } from "@/lib/hooks/use-fields";
-import type { ViewConfig, ViewSummary } from "@/lib/hooks/use-views";
+import type { ViewConfigPatch, ViewSummary } from "@/lib/hooks/use-views";
 import { useUpdateView } from "@/lib/hooks/use-views";
 import { Select } from "@/components/ui/select";
 import { FilterValueInput } from "./filter-value-input";
-import { COLORABLE_TYPES, GROUPABLE_TYPES, NO_VALUE_OPS, OPS_BY_FIELD_TYPE, OP_LABELS } from "@/lib/filter-meta";
+import {
+  COLORABLE_TYPES,
+  GROUPABLE_TYPES,
+  NO_VALUE_OPS,
+  OPS_BY_FIELD_TYPE,
+  OP_LABELS,
+  SORT_DIRECTION_LABELS,
+} from "@/lib/filter-meta";
 import { ChevronDownIcon, PaletteIcon, PlusIcon, SortIcon, TagsIcon, TrashIcon } from "@/components/ui/icons";
 
 function usePopover() {
@@ -63,7 +70,7 @@ export function ViewToolbar({
   const updateView = useUpdateView(tableId);
   const config = view.config;
 
-  function patch(next: Partial<ViewConfig>) {
+  function patch(next: ViewConfigPatch) {
     updateView.mutate({ viewId: view.id, config: next });
   }
 
@@ -72,7 +79,9 @@ export function ViewToolbar({
   const conditions = filterGroup.children.filter((c): c is FilterCondition => !isFilterGroup(c));
 
   function setConditions(next: FilterCondition[], conjunction: "and" | "or" = filterGroup.conjunction) {
-    patch({ filters: next.length > 0 ? { conjunction, children: next } : undefined });
+    // `null`, not `undefined` — see ViewConfigPatch: only null survives JSON
+    // encoding as an explicit "clear this key" instruction to the server.
+    patch({ filters: next.length > 0 ? { conjunction, children: next } : null });
   }
 
   const sorts = config.sorts ?? [];
@@ -216,17 +225,20 @@ export function ViewToolbar({
                     options={fields.map((f) => ({ value: f.id, label: f.name }))}
                   />
                   <Select
-                    className="w-24 shrink-0"
+                    className="w-32 shrink-0"
                     value={s.direction}
                     onChange={(v) => {
                       const next = [...sorts];
                       next[idx] = { ...s, direction: v as "asc" | "desc" };
                       setSorts(next);
                     }}
-                    options={[
-                      { value: "asc", label: "A → Z" },
-                      { value: "desc", label: "Z → A" },
-                    ]}
+                    options={(() => {
+                      const dirLabels = SORT_DIRECTION_LABELS[fieldById(s.fieldId)?.type ?? "singleLineText"];
+                      return [
+                        { value: "asc", label: dirLabels.asc },
+                        { value: "desc", label: dirLabels.desc },
+                      ];
+                    })()}
                   />
                   <button
                     onClick={() => setSorts(sorts.filter((_, i) => i !== idx))}
@@ -267,7 +279,7 @@ export function ViewToolbar({
             <p className="mb-2 text-[12px] font-medium text-[var(--color-fg-muted)]">Group by field</p>
             <Select
               value={config.groupByFieldId ?? ""}
-              onChange={(v) => patch({ groupByFieldId: v || undefined })}
+              onChange={(v) => patch({ groupByFieldId: v || null })}
               placeholder="None"
               options={[{ value: "", label: "None" }, ...groupableFields.map((f) => ({ value: f.id, label: f.name }))]}
             />
@@ -293,7 +305,7 @@ export function ViewToolbar({
             ) : (
               <Select
                 value={config.colorFieldId ?? ""}
-                onChange={(v) => patch({ colorFieldId: v || undefined })}
+                onChange={(v) => patch({ colorFieldId: v || null })}
                 placeholder="None"
                 options={[{ value: "", label: "None" }, ...colorableFields.map((f) => ({ value: f.id, label: f.name }))]}
               />

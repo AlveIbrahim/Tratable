@@ -55,3 +55,26 @@ export const GROUPABLE_TYPES: FieldType[] = [
   "autoNumber", "createdTime", "lastModifiedTime",
 ];
 export const COLORABLE_TYPES: FieldType[] = ["singleSelect", "multiSelect"];
+
+/** "A → Z" only makes sense for text — a number/date/checkbox field sorted
+ * that way reads as broken even though the underlying ORDER BY is correct.
+ * One label pair per field type, keyed off what asc/desc actually mean for
+ * that type's values. */
+export const SORT_DIRECTION_LABELS: Record<FieldType, { asc: string; desc: string }> = {
+  singleLineText: { asc: "A → Z", desc: "Z → A" },
+  longText: { asc: "A → Z", desc: "Z → A" },
+  email: { asc: "A → Z", desc: "Z → A" },
+  url: { asc: "A → Z", desc: "Z → A" },
+  phone: { asc: "A → Z", desc: "Z → A" },
+  singleSelect: { asc: "A → Z", desc: "Z → A" },
+  multiSelect: { asc: "A → Z", desc: "Z → A" },
+  linkToRecord: { asc: "A → Z", desc: "Z → A" },
+  attachment: { asc: "A → Z", desc: "Z → A" },
+  number: { asc: "1 → 9", desc: "9 → 1" },
+  autoNumber: { asc: "1 → 9", desc: "9 → 1" },
+  date: { asc: "Oldest → Newest", desc: "Newest → Oldest" },
+  dateTime: { asc: "Oldest → Newest", desc: "Newest → Oldest" },
+  createdTime: { asc: "Oldest → Newest", desc: "Newest → Oldest" },
+  lastModifiedTime: { asc: "Oldest → Newest", desc: "Newest → Oldest" },
+  checkbox: { asc: "Unchecked → Checked", desc: "Checked → Unchecked" },
+};
