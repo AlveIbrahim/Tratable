@@ -1,0 +1,14 @@
+DROP TABLE IF EXISTS attachments;
+DROP TABLE IF EXISTS refresh_tokens;
+DROP TABLE IF EXISTS import_jobs;
+DROP TABLE IF EXISTS interface_pages;
+DROP TABLE IF EXISTS interfaces;
+DROP TABLE IF EXISTS records;
+DROP TABLE IF EXISTS views;
+ALTER TABLE IF EXISTS tables DROP CONSTRAINT IF EXISTS tables_primary_field_fk;
+DROP TABLE IF EXISTS fields;
+DROP TABLE IF EXISTS tables;
+DROP TABLE IF EXISTS bases;
+DROP TABLE IF EXISTS workspace_members;
+DROP TABLE IF EXISTS workspaces;
+DROP TABLE IF EXISTS users;
