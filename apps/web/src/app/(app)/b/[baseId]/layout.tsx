@@ -2,10 +2,11 @@
 
 import { use, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import clsx from "clsx";
 import { useBase } from "@/lib/hooks/use-bases";
 import { useCreateTable, useTables } from "@/lib/hooks/use-tables";
+import { ImportWizard } from "@/components/import/import-wizard";
 
 export default function BaseLayout({
   children,
@@ -19,7 +20,9 @@ export default function BaseLayout({
   const { data: tables } = useTables(baseId);
   const createTable = useCreateTable(baseId);
   const pathname = usePathname();
+  const router = useRouter();
   const [creating, setCreating] = useState(false);
+  const [importing, setImporting] = useState(false);
 
   async function onCreateTable() {
     const name = prompt("Table name?");
@@ -62,9 +65,25 @@ export default function BaseLayout({
           >
             + Table
           </button>
+          <button
+            onClick={() => setImporting(true)}
+            className="shrink-0 rounded px-3 py-1.5 text-sm text-[var(--color-muted)] hover:bg-black/5 dark:hover:bg-white/5"
+          >
+            Import CSV
+          </button>
         </div>
       </header>
       <div className="min-h-0 flex-1">{children}</div>
+      {importing && tables && (
+        <ImportWizard
+          baseId={baseId}
+          tables={tables}
+          onClose={() => setImporting(false)}
+          onImported={(tableId) => {
+            if (tableId) router.push(`/b/${baseId}/t/${tableId}`);
+          }}
+        />
+      )}
     </div>
   );
 }

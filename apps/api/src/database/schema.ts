@@ -163,7 +163,7 @@ export interface ImportJobsTable {
   error_report_path: string | null;
   created_by: string;
   created_at: ColumnType<Date, string | undefined, never>;
-  completed_at: ColumnType<Date | null, string | null | undefined, never>;
+  completed_at: ColumnType<Date | null, string | null | undefined, string | null | undefined>;
 }
 export type ImportJobRow = Selectable<ImportJobsTable>;
 export type NewImportJobRow = Insertable<ImportJobsTable>;

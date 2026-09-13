@@ -3,7 +3,7 @@ import { sql } from "kysely";
 import { WorkspaceRole } from "@tratable/shared";
 import { DatabaseService } from "../database/database.service";
 
-export type ResourceKind = "workspace" | "base" | "table" | "field" | "view" | "record" | "interface" | "page";
+export type ResourceKind = "workspace" | "base" | "table" | "field" | "view" | "record" | "interface" | "page" | "importJob";
 
 /**
  * Resolves "does user X have role >= Y on the workspace that owns resource Z"
@@ -103,6 +103,16 @@ export class WorkspaceAccessService {
           .select("workspace_members.role as role")
           .where("workspace_members.user_id", "=", userId)
           .where("interface_pages.id", "=", resourceId)
+          .executeTakeFirst();
+
+      case "importJob":
+        return raw
+          .selectFrom("workspace_members")
+          .innerJoin("bases", "bases.workspace_id", "workspace_members.workspace_id")
+          .innerJoin("import_jobs", "import_jobs.base_id", "bases.id")
+          .select("workspace_members.role as role")
+          .where("workspace_members.user_id", "=", userId)
+          .where("import_jobs.id", "=", resourceId)
           .executeTakeFirst();
 
       default:
