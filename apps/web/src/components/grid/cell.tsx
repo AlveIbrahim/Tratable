@@ -3,6 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import type { FieldSummary } from "@/lib/hooks/use-fields";
 import { SelectCellEditor } from "./select-cell-editor";
+import { chipStyle } from "@/lib/colors";
+import { CheckSquareIcon, LinkIcon, PaperclipIcon } from "@/components/ui/icons";
 
 interface SelectChoice {
   id: string;
@@ -17,29 +19,37 @@ interface SelectChoice {
  * differ slightly — e.g. checkboxes render as a box, not "true"/"false"). */
 export function CellDisplay({ field, value }: { field: FieldSummary; value: unknown }) {
   if (value === null || value === undefined || value === "") {
-    return <span className="text-transparent">—</span>;
+    return null;
   }
 
   switch (field.type) {
     case "checkbox":
-      return <span>{value ? "✓" : ""}</span>;
+      return value ? (
+        <CheckSquareIcon width={15} height={15} className="text-[var(--color-accent)]" />
+      ) : null;
     case "singleSelect": {
       const choices = (field.options.choices as SelectChoice[]) ?? [];
       const choice = choices.find((c) => c.id === value);
       if (!choice) return null;
       return (
-        <span className="rounded bg-black/5 px-1.5 py-0.5 text-xs dark:bg-white/10">{choice.name}</span>
+        <span className="truncate rounded-full px-2 py-0.5 text-[12px] font-medium" style={chipStyle(choice.id)}>
+          {choice.name}
+        </span>
       );
     }
     case "multiSelect": {
       const choices = (field.options.choices as SelectChoice[]) ?? [];
       const ids = Array.isArray(value) ? (value as string[]) : [];
       return (
-        <span className="flex gap-1">
+        <span className="flex flex-wrap gap-1">
           {ids.map((id) => {
             const choice = choices.find((c) => c.id === id);
             return choice ? (
-              <span key={id} className="rounded bg-black/5 px-1.5 py-0.5 text-xs dark:bg-white/10">
+              <span
+                key={id}
+                className="shrink-0 truncate rounded-full px-2 py-0.5 text-[12px] font-medium"
+                style={chipStyle(choice.id)}
+              >
                 {choice.name}
               </span>
             ) : null;
@@ -48,9 +58,19 @@ export function CellDisplay({ field, value }: { field: FieldSummary; value: unkn
       );
     }
     case "linkToRecord":
-      return <span className="text-[var(--color-muted)]">{(value as string[]).length} linked</span>;
+      return (
+        <span className="flex items-center gap-1 text-[var(--color-fg-muted)]">
+          <LinkIcon width={12} height={12} />
+          {(value as string[]).length}
+        </span>
+      );
     case "attachment":
-      return <span className="text-[var(--color-muted)]">{(value as unknown[]).length} file(s)</span>;
+      return (
+        <span className="flex items-center gap-1 text-[var(--color-fg-muted)]">
+          <PaperclipIcon width={12} height={12} />
+          {(value as unknown[]).length}
+        </span>
+      );
     default:
       return <span className="truncate">{String(value)}</span>;
   }
@@ -96,7 +116,7 @@ export function CellEditor({
           if (e.key === "Enter" || e.key === " ") onCommit((e.target as HTMLInputElement).checked);
           onKeyDown(e);
         }}
-        className="h-4 w-4"
+        className="h-[15px] w-[15px] accent-[var(--color-accent)]"
       />
     );
   }
@@ -139,7 +159,7 @@ export function CellEditor({
         }
         onKeyDown(e);
       }}
-      className="w-full bg-transparent text-sm outline-none"
+      className="w-full bg-transparent text-[13px] outline-none"
     />
   );
 }

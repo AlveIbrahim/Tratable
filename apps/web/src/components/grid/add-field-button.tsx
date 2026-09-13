@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { FieldType } from "@tratable/shared";
 import { useCreateField } from "@/lib/hooks/use-fields";
 import { Select } from "@/components/ui/select";
+import { PlusIcon } from "@/components/ui/icons";
 
 const FIELD_TYPE_OPTIONS: { value: FieldType; label: string }[] = [
   { value: "singleLineText", label: "Single line text" },
@@ -42,9 +43,10 @@ export function AddFieldButton({ tableId }: { tableId: string }) {
     return (
       <button
         onClick={() => setOpen(true)}
-        className="flex h-full w-full items-center justify-center text-sm text-[var(--color-muted)] hover:bg-black/5 dark:hover:bg-white/5"
+        className="flex h-full w-full items-center justify-center gap-1 text-[12.5px] text-[var(--color-fg-subtle)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-fg-muted)]"
       >
-        + Field
+        <PlusIcon width={13} height={13} />
+        Field
       </button>
     );
   }
@@ -52,24 +54,28 @@ export function AddFieldButton({ tableId }: { tableId: string }) {
   return (
     <form
       onSubmit={onSubmit}
-      className="absolute z-20 w-64 space-y-2 rounded border border-[var(--color-border)] bg-[var(--color-bg)] p-3 shadow-lg"
+      className="absolute z-20 w-64 space-y-2.5 rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-raised)] p-3 shadow-[var(--shadow-lg)]"
     >
       <input
         autoFocus
         placeholder="Field name"
         value={name}
         onChange={(e) => setName(e.target.value)}
-        className="w-full rounded border border-[var(--color-border)] bg-transparent px-2 py-1.5 text-sm outline-none focus:border-[var(--color-accent)]"
+        className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-2 text-[13px] outline-none transition-colors focus:border-[var(--color-accent)]"
       />
       <Select value={type} onChange={(v) => setType(v as FieldType)} options={FIELD_TYPE_OPTIONS} />
-      <div className="flex justify-end gap-2">
-        <button type="button" onClick={() => setOpen(false)} className="px-2 py-1 text-sm text-[var(--color-muted)]">
+      <div className="flex justify-end gap-2 pt-0.5">
+        <button
+          type="button"
+          onClick={() => setOpen(false)}
+          className="rounded-[var(--radius-sm)] px-2.5 py-1.5 text-[12.5px] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]"
+        >
           Cancel
         </button>
         <button
           type="submit"
           disabled={createField.isPending || !name.trim()}
-          className="rounded bg-[var(--color-accent)] px-3 py-1 text-sm font-medium text-[var(--color-accent-fg)] disabled:opacity-50"
+          className="rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-3 py-1.5 text-[12.5px] font-medium text-[var(--color-accent-fg)] transition-colors hover:bg-[var(--color-accent-hover)] disabled:opacity-50"
         >
           Create
         </button>

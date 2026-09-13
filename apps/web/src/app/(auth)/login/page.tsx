@@ -30,44 +30,61 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <form onSubmit={onSubmit} className="w-full max-w-sm space-y-4">
-        <h1 className="text-xl font-semibold">Log in to Tratable</h1>
-        {error && <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
-        <div className="space-y-1">
-          <label className="text-sm text-[var(--color-muted)]">Email</label>
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded border border-[var(--color-border)] bg-transparent px-3 py-2 text-sm outline-none focus:border-[var(--color-accent)]"
-          />
+    <div className="flex min-h-screen items-center justify-center bg-[var(--color-bg)] px-4">
+      <div className="w-full max-w-[360px]">
+        <div className="mb-8 flex flex-col items-center gap-3">
+          <div className="flex h-11 w-11 items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-accent)] text-lg font-bold text-[var(--color-accent-fg)] shadow-[var(--shadow-sm)]">
+            T
+          </div>
+          <h1 className="text-[17px] font-semibold">Log in to Tratable</h1>
         </div>
-        <div className="space-y-1">
-          <label className="text-sm text-[var(--color-muted)]">Password</label>
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded border border-[var(--color-border)] bg-transparent px-3 py-2 text-sm outline-none focus:border-[var(--color-accent)]"
-          />
-        </div>
-        <button
-          type="submit"
-          disabled={submitting}
-          className="w-full rounded bg-[var(--color-accent)] py-2 text-sm font-medium text-[var(--color-accent-fg)] disabled:opacity-50"
+
+        <form
+          onSubmit={onSubmit}
+          className="space-y-4 rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-surface)] p-6 shadow-[var(--shadow-md)]"
         >
-          {submitting ? "Logging in…" : "Log in"}
-        </button>
-        <p className="text-center text-sm text-[var(--color-muted)]">
+          {error && (
+            <p className="rounded-[var(--radius-sm)] bg-[var(--color-danger-soft)] px-3 py-2 text-[13px] text-[var(--color-danger)]">
+              {error}
+            </p>
+          )}
+          <div className="space-y-1.5">
+            <label className="text-[12.5px] font-medium text-[var(--color-fg-muted)]">Email</label>
+            <input
+              type="email"
+              required
+              autoFocus
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--color-accent)]"
+            />
+          </div>
+          <div className="space-y-1.5">
+            <label className="text-[12.5px] font-medium text-[var(--color-fg-muted)]">Password</label>
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-sm outline-none transition-colors focus:border-[var(--color-accent)]"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={submitting}
+            className="w-full rounded-[var(--radius-sm)] bg-[var(--color-accent)] py-2 text-sm font-medium text-[var(--color-accent-fg)] shadow-[var(--shadow-sm)] transition-colors hover:bg-[var(--color-accent-hover)] disabled:opacity-50"
+          >
+            {submitting ? "Logging in…" : "Log in"}
+          </button>
+        </form>
+
+        <p className="mt-5 text-center text-[13px] text-[var(--color-fg-muted)]">
           No account?{" "}
-          <Link href="/register" className="text-[var(--color-accent)]">
+          <Link href="/register" className="font-medium text-[var(--color-accent)] hover:underline">
             Register
           </Link>
         </p>
-      </form>
+      </div>
     </div>
   );
 }

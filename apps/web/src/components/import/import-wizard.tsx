@@ -12,6 +12,7 @@ import {
   useInvalidateAfterImport,
   useUploadImport,
 } from "@/lib/hooks/use-imports";
+import { DownloadIcon, UploadIcon, XIcon } from "@/components/ui/icons";
 
 const CREATABLE_TYPES: { value: FieldType; label: string }[] = [
   { value: "singleLineText", label: "Single line text" },
@@ -27,7 +28,48 @@ const CREATABLE_TYPES: { value: FieldType; label: string }[] = [
   { value: "phone", label: "Phone" },
 ];
 
+const ACTION_OPTIONS = (allowMapToField: boolean) => [
+  { value: "createField", label: "Create field" },
+  ...(allowMapToField ? [{ value: "mapToField", label: "Map to existing" }] : []),
+  { value: "skip", label: "Skip" },
+];
+
 type Step = "pick" | "mapping" | "running" | "done";
+const STEP_LABELS: { key: Step; label: string }[] = [
+  { key: "pick", label: "Upload" },
+  { key: "mapping", label: "Map" },
+  { key: "running", label: "Import" },
+  { key: "done", label: "Done" },
+];
+
+function StepIndicator({ step }: { step: Step }) {
+  const idx = STEP_LABELS.findIndex((s) => s.key === step);
+  return (
+    <div className="flex items-center gap-2">
+      {STEP_LABELS.map((s, i) => (
+        <div key={s.key} className="flex items-center gap-2">
+          <div
+            className={`flex h-5 w-5 items-center justify-center rounded-full text-[10.5px] font-semibold transition-colors ${
+              i < idx
+                ? "bg-[var(--color-accent)] text-[var(--color-accent-fg)]"
+                : i === idx
+                  ? "bg-[var(--color-accent-soft)] text-[var(--color-accent)] ring-2 ring-[var(--color-accent)]"
+                  : "bg-[var(--color-surface-hover)] text-[var(--color-fg-subtle)]"
+            }`}
+          >
+            {i + 1}
+          </div>
+          <span
+            className={`text-[12px] ${i === idx ? "font-medium text-[var(--color-fg)]" : "text-[var(--color-fg-subtle)]"}`}
+          >
+            {s.label}
+          </span>
+          {i < STEP_LABELS.length - 1 && <div className="h-px w-4 bg-[var(--color-border)]" />}
+        </div>
+      ))}
+    </div>
+  );
+}
 
 export function ImportWizard({
   baseId,
@@ -64,9 +106,9 @@ export function ImportWizard({
   }, [isDone, step]);
 
   const [uploadedFileName, setUploadedFileName] = useState("");
+  const [dragOver, setDragOver] = useState(false);
 
-  async function onFileSelected() {
-    const file = fileRef.current?.files?.[0];
+  async function handleFile(file: File | undefined) {
     if (!file) return;
     setError(null);
     try {
@@ -146,44 +188,99 @@ export function ImportWizard({
     return !!targetTableId && !!upsertKeyFieldId;
   }, [targetMode, targetTableId, newTableName, upsertKeyFieldId]);
 
+  const modeCards: { value: typeof targetMode; title: string; desc: string }[] = [
+    { value: "new_table", title: "New table", desc: "Create a table from this file" },
+    { value: "append", title: "Append", desc: "Add rows to an existing table" },
+    { value: "upsert", title: "Upsert", desc: "Update matches, append the rest" },
+  ];
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-lg border border-[var(--color-border)] bg-[var(--color-bg)] shadow-xl">
-        <div className="flex items-center justify-between border-b border-[var(--color-border)] px-4 py-3">
-          <h2 className="text-sm font-semibold">Import CSV</h2>
-          <button onClick={onClose} className="text-sm text-[var(--color-muted)]">
-            ✕
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/45 p-4 backdrop-blur-[2px]">
+      <div className="flex max-h-[85vh] w-full max-w-2xl flex-col rounded-[var(--radius-lg)] border border-[var(--color-border)] bg-[var(--color-raised)] shadow-[var(--shadow-lg)]">
+        <div className="flex items-center justify-between border-b border-[var(--color-border)] px-5 py-3.5">
+          <div>
+            <h2 className="text-[14px] font-semibold">Import CSV</h2>
+            <div className="mt-1.5">
+              <StepIndicator step={step} />
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="rounded-[var(--radius-sm)] p-1.5 text-[var(--color-fg-subtle)] hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-fg)]"
+          >
+            <XIcon width={15} height={15} />
           </button>
         </div>
 
-        <div className="flex-1 overflow-auto p-4">
-          {error && <p className="mb-3 rounded bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>}
+        <div className="flex-1 overflow-auto p-5">
+          {error && (
+            <p className="mb-3 rounded-[var(--radius-sm)] bg-[var(--color-danger-soft)] px-3 py-2 text-[13px] text-[var(--color-danger)]">
+              {error}
+            </p>
+          )}
 
           {step === "pick" && (
-            <div className="space-y-3">
-              <p className="text-sm text-[var(--color-muted)]">Choose a .csv file to import.</p>
-              <input ref={fileRef} type="file" accept=".csv,.tsv,.txt" onChange={onFileSelected} className="text-sm" />
-              {upload.isPending && <p className="text-sm text-[var(--color-muted)]">Uploading…</p>}
+            <div>
+              <label
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  handleFile(e.dataTransfer.files?.[0]);
+                }}
+                className={`flex cursor-pointer flex-col items-center gap-3 rounded-[var(--radius-lg)] border-2 border-dashed px-6 py-14 text-center transition-colors ${
+                  dragOver
+                    ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
+                    : "border-[var(--color-border-strong)] hover:border-[var(--color-accent)]"
+                }`}
+              >
+                <div className="flex h-11 w-11 items-center justify-center rounded-full bg-[var(--color-accent-soft)] text-[var(--color-accent)]">
+                  <UploadIcon width={20} height={20} />
+                </div>
+                <div className="text-[13.5px] font-medium">Drop a .csv file here, or click to browse</div>
+                <div className="text-[12px] text-[var(--color-fg-subtle)]">CSV, TSV, or plain text — up to 50MB</div>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept=".csv,.tsv,.txt"
+                  onChange={(e) => handleFile(e.target.files?.[0])}
+                  className="hidden"
+                />
+              </label>
+              {upload.isPending && (
+                <p className="mt-3 text-center text-[13px] text-[var(--color-fg-muted)]">Uploading…</p>
+              )}
             </div>
           )}
 
           {step === "mapping" && analysis && (
-            <div className="space-y-4">
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Import into</label>
-                <div className="flex gap-3 text-sm">
-                  <label className="flex items-center gap-1.5">
-                    <input type="radio" checked={targetMode === "new_table"} onChange={() => setTargetMode("new_table")} />
-                    New table
-                  </label>
-                  <label className="flex items-center gap-1.5">
-                    <input type="radio" checked={targetMode === "append"} onChange={() => setTargetMode("append")} />
-                    Append to existing
-                  </label>
-                  <label className="flex items-center gap-1.5">
-                    <input type="radio" checked={targetMode === "upsert"} onChange={() => setTargetMode("upsert")} />
-                    Update or append (upsert)
-                  </label>
+            <div className="space-y-5">
+              <div className="space-y-2.5">
+                <label className="text-[12.5px] font-semibold text-[var(--color-fg-muted)]">Import into</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {modeCards.map((c) => (
+                    <button
+                      key={c.value}
+                      type="button"
+                      onClick={() => setTargetMode(c.value)}
+                      className={`rounded-[var(--radius-md)] border px-3 py-2.5 text-left transition-colors ${
+                        targetMode === c.value
+                          ? "border-[var(--color-accent)] bg-[var(--color-accent-soft)]"
+                          : "border-[var(--color-border)] hover:border-[var(--color-border-strong)]"
+                      }`}
+                    >
+                      <div
+                        className={`text-[12.5px] font-medium ${targetMode === c.value ? "text-[var(--color-accent)]" : ""}`}
+                      >
+                        {c.title}
+                      </div>
+                      <div className="mt-0.5 text-[11.5px] text-[var(--color-fg-subtle)]">{c.desc}</div>
+                    </button>
+                  ))}
                 </div>
 
                 {targetMode === "new_table" ? (
@@ -191,72 +288,57 @@ export function ImportWizard({
                     value={newTableName}
                     onChange={(e) => setNewTableName(e.target.value)}
                     placeholder="Table name"
-                    className="w-full rounded border border-[var(--color-border)] bg-transparent px-3 py-1.5 text-sm outline-none focus:border-[var(--color-accent)]"
+                    className="w-full rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-3 py-2 text-[13px] outline-none transition-colors focus:border-[var(--color-accent)]"
                   />
                 ) : (
-                  <select
+                  <Select
                     value={targetTableId}
-                    onChange={(e) => setTargetTableId(e.target.value)}
-                    className="w-full rounded border border-[var(--color-border)] bg-transparent px-3 py-1.5 text-sm outline-none"
-                  >
-                    <option value="">Select a table…</option>
-                    {tables.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setTargetTableId}
+                    placeholder="Select a table…"
+                    options={tables.map((t) => ({ value: t.id, label: t.name }))}
+                  />
                 )}
 
                 {targetMode === "upsert" && targetFields && (
-                  <select
+                  <Select
                     value={upsertKeyFieldId}
-                    onChange={(e) => setUpsertKeyFieldId(e.target.value)}
-                    className="w-full rounded border border-[var(--color-border)] bg-transparent px-3 py-1.5 text-sm outline-none"
-                  >
-                    <option value="">Match rows on…</option>
-                    {targetFields.map((f) => (
-                      <option key={f.id} value={f.id}>
-                        {f.name}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={setUpsertKeyFieldId}
+                    placeholder="Match rows on…"
+                    options={targetFields.map((f) => ({ value: f.id, label: f.name }))}
+                  />
                 )}
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Column mapping</label>
-                <div className="overflow-hidden rounded border border-[var(--color-border)]">
-                  <table className="w-full text-sm">
-                    <thead className="bg-black/5 text-xs text-[var(--color-muted)] dark:bg-white/5">
+              <div className="space-y-2.5">
+                <label className="text-[12.5px] font-semibold text-[var(--color-fg-muted)]">Column mapping</label>
+                <div className="overflow-hidden rounded-[var(--radius-md)] border border-[var(--color-border)]">
+                  <table className="w-full text-[13px]">
+                    <thead className="bg-[var(--color-surface)] text-[11.5px] font-medium uppercase tracking-wide text-[var(--color-fg-subtle)]">
                       <tr>
-                        <th className="px-2 py-1.5 text-left">CSV column</th>
-                        <th className="px-2 py-1.5 text-left">Action</th>
-                        <th className="px-2 py-1.5 text-left">Field</th>
+                        <th className="px-3 py-2 text-left">CSV column</th>
+                        <th className="px-3 py-2 text-left">Action</th>
+                        <th className="px-3 py-2 text-left">Field</th>
                       </tr>
                     </thead>
                     <tbody>
                       {mappings.map((m, idx) => (
                         <tr key={m.csvColumn} className="border-t border-[var(--color-border)]">
-                          <td className="px-2 py-1.5">{m.csvColumn}</td>
-                          <td className="px-2 py-1.5">
-                            <select
+                          <td className="px-3 py-2 font-medium">{m.csvColumn}</td>
+                          <td className="px-3 py-2">
+                            <Select
+                              className="w-40"
                               value={m.action}
-                              onChange={(e) => updateMapping(idx, { action: e.target.value as any })}
-                              className="rounded border border-[var(--color-border)] bg-transparent px-1.5 py-1 text-xs"
-                            >
-                              <option value="createField">Create field</option>
-                              {targetMode !== "new_table" && <option value="mapToField">Map to existing</option>}
-                              <option value="skip">Skip</option>
-                            </select>
+                              onChange={(v) => updateMapping(idx, { action: v as any })}
+                              options={ACTION_OPTIONS(targetMode !== "new_table")}
+                            />
                           </td>
-                          <td className="px-2 py-1.5">
+                          <td className="px-3 py-2">
                             {m.action === "createField" && (
-                              <div className="flex gap-1">
+                              <div className="flex gap-1.5">
                                 <input
                                   value={m.fieldName ?? ""}
                                   onChange={(e) => updateMapping(idx, { fieldName: e.target.value })}
-                                  className="w-28 rounded border border-[var(--color-border)] bg-transparent px-1.5 py-1 text-xs"
+                                  className="w-28 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-[12.5px] outline-none focus:border-[var(--color-accent)]"
                                 />
                                 <Select
                                   className="w-36"
@@ -267,19 +349,15 @@ export function ImportWizard({
                               </div>
                             )}
                             {m.action === "mapToField" && (
-                              <select
+                              <Select
+                                className="w-44"
                                 value={m.fieldId ?? ""}
-                                onChange={(e) => updateMapping(idx, { fieldId: e.target.value })}
-                                className="rounded border border-[var(--color-border)] bg-transparent px-1.5 py-1 text-xs"
-                              >
-                                <option value="">Select field…</option>
-                                {targetFields?.map((f) => (
-                                  <option key={f.id} value={f.id}>
-                                    {f.name}
-                                  </option>
-                                ))}
-                              </select>
+                                onChange={(v) => updateMapping(idx, { fieldId: v })}
+                                placeholder="Select field…"
+                                options={(targetFields ?? []).map((f) => ({ value: f.id, label: f.name }))}
+                              />
                             )}
+                            {m.action === "skip" && <span className="text-[var(--color-fg-subtle)]">—</span>}
                           </td>
                         </tr>
                       ))}
@@ -291,34 +369,55 @@ export function ImportWizard({
           )}
 
           {step === "running" && (
-            <div className="space-y-2 text-sm">
-              <p>Importing… {status?.progressPercent ?? 0}%</p>
-              <div className="h-2 overflow-hidden rounded bg-black/10 dark:bg-white/10">
+            <div className="flex flex-col items-center gap-4 py-10">
+              <div className="h-2 w-full max-w-sm overflow-hidden rounded-full bg-[var(--color-surface-hover)]">
                 <div
-                  className="h-full bg-[var(--color-accent)] transition-all"
+                  className="h-full rounded-full bg-[var(--color-accent)] transition-all"
                   style={{ width: `${status?.progressPercent ?? 0}%` }}
                 />
               </div>
+              <p className="text-[13px] text-[var(--color-fg-muted)]">Importing… {status?.progressPercent ?? 0}%</p>
             </div>
           )}
 
           {step === "done" && status && (
-            <div className="space-y-2 text-sm">
-              <p className={status.status === "failed" ? "text-red-600" : ""}>
-                {status.status === "failed" ? "Import failed." : "Import complete."}
+            <div className="space-y-3">
+              <p
+                className={`text-[14px] font-medium ${status.status === "failed" ? "text-[var(--color-danger)]" : "text-[var(--color-success)]"}`}
+              >
+                {status.status === "failed" ? "Import failed" : "Import complete"}
               </p>
               {status.stats && "error" in status.stats && (
-                <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{status.stats.error}</p>
+                <p className="rounded-[var(--radius-sm)] bg-[var(--color-danger-soft)] px-3 py-2 text-[13px] text-[var(--color-danger)]">
+                  {status.stats.error}
+                </p>
               )}
               {status.stats && "inserted" in status.stats && (
-                <ul className="text-[var(--color-muted)]">
-                  <li>Inserted: {status.stats.inserted}</li>
-                  <li>Updated: {status.stats.updated}</li>
-                  <li>Cell errors: {status.stats.failed}</li>
-                </ul>
+                <div className="grid grid-cols-3 gap-2">
+                  <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2.5">
+                    <div className="text-[18px] font-semibold">{status.stats.inserted}</div>
+                    <div className="text-[11.5px] text-[var(--color-fg-subtle)]">Inserted</div>
+                  </div>
+                  <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2.5">
+                    <div className="text-[18px] font-semibold">{status.stats.updated}</div>
+                    <div className="text-[11.5px] text-[var(--color-fg-subtle)]">Updated</div>
+                  </div>
+                  <div className="rounded-[var(--radius-md)] border border-[var(--color-border)] px-3 py-2.5">
+                    <div
+                      className={`text-[18px] font-semibold ${status.stats.failed > 0 ? "text-[var(--color-danger)]" : ""}`}
+                    >
+                      {status.stats.failed}
+                    </div>
+                    <div className="text-[11.5px] text-[var(--color-fg-subtle)]">Cell errors</div>
+                  </div>
+                </div>
               )}
               {status.errorReportUrl && (
-                <a href={status.errorReportUrl} className="text-[var(--color-accent)] underline">
+                <a
+                  href={status.errorReportUrl}
+                  className="flex w-fit items-center gap-1.5 text-[13px] font-medium text-[var(--color-accent)] hover:underline"
+                >
+                  <DownloadIcon width={13} height={13} />
                   Download error report
                 </a>
               )}
@@ -326,12 +425,12 @@ export function ImportWizard({
           )}
         </div>
 
-        <div className="flex justify-end gap-2 border-t border-[var(--color-border)] px-4 py-3">
+        <div className="flex justify-end gap-2 border-t border-[var(--color-border)] px-5 py-3.5">
           {step === "mapping" && (
             <button
               onClick={onRunImport}
               disabled={!canRun || execute.isPending}
-              className="rounded bg-[var(--color-accent)] px-4 py-1.5 text-sm font-medium text-[var(--color-accent-fg)] disabled:opacity-50"
+              className="rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-4 py-1.5 text-[13px] font-medium text-[var(--color-accent-fg)] transition-colors hover:bg-[var(--color-accent-hover)] disabled:opacity-50"
             >
               Import
             </button>
@@ -339,7 +438,7 @@ export function ImportWizard({
           {step === "done" && status?.status === "failed" && (
             <button
               onClick={() => setStep("mapping")}
-              className="rounded border border-[var(--color-border)] px-4 py-1.5 text-sm font-medium"
+              className="rounded-[var(--radius-sm)] border border-[var(--color-border)] px-4 py-1.5 text-[13px] font-medium hover:bg-[var(--color-surface-hover)]"
             >
               Back to mapping
             </button>
@@ -347,7 +446,7 @@ export function ImportWizard({
           {step === "done" && (
             <button
               onClick={onFinish}
-              className="rounded bg-[var(--color-accent)] px-4 py-1.5 text-sm font-medium text-[var(--color-accent-fg)]"
+              className="rounded-[var(--radius-sm)] bg-[var(--color-accent)] px-4 py-1.5 text-[13px] font-medium text-[var(--color-accent-fg)] transition-colors hover:bg-[var(--color-accent-hover)]"
             >
               Done
             </button>

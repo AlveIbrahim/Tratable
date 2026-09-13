@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { ChevronDownIcon } from "./icons";
 
 export interface SelectOption {
   value: string;
@@ -59,13 +60,15 @@ export function Select({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between gap-2 rounded border border-[var(--color-border)] bg-transparent px-2 py-1.5 text-left text-sm outline-none focus:border-[var(--color-accent)]"
+        className="flex w-full items-center justify-between gap-2 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2.5 py-2 text-left text-[13px] outline-none transition-colors focus:border-[var(--color-accent)]"
       >
-        <span className={selected ? "" : "text-[var(--color-muted)]"}>{selected?.label ?? placeholder ?? "Select…"}</span>
-        <span className="text-[var(--color-muted)]">▾</span>
+        <span className={selected ? "" : "text-[var(--color-fg-subtle)]"}>
+          {selected?.label ?? placeholder ?? "Select…"}
+        </span>
+        <ChevronDownIcon width={13} height={13} className="shrink-0 text-[var(--color-fg-subtle)]" />
       </button>
       {open && (
-        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-auto rounded border border-[var(--color-border)] bg-[var(--color-bg)] py-1 shadow-lg">
+        <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-60 overflow-auto rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-raised)] py-1 shadow-[var(--shadow-lg)]">
           {options.map((opt) => (
             <button
               key={opt.value}
@@ -74,8 +77,8 @@ export function Select({
                 onChange(opt.value);
                 setOpen(false);
               }}
-              className={`block w-full px-2 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10 ${
-                opt.value === value ? "bg-[var(--color-accent)]/15 font-medium" : ""
+              className={`block w-full px-2.5 py-1.5 text-left text-[13px] hover:bg-[var(--color-surface-hover)] ${
+                opt.value === value ? "bg-[var(--color-accent-soft)] font-medium text-[var(--color-accent)]" : ""
               }`}
             >
               {opt.label}

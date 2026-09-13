@@ -4,6 +4,8 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import type { FieldSummary } from "@/lib/hooks/use-fields";
 import { useUpdateField } from "@/lib/hooks/use-fields";
+import { chipStyle } from "@/lib/colors";
+import { CheckSquareIcon, ListPlusIcon } from "@/components/ui/icons";
 
 interface Choice {
   id: string;
@@ -130,40 +132,47 @@ export function SelectCellEditor({
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={onKeyDown}
         placeholder="Find an option"
-        className="w-full bg-transparent text-sm outline-none"
+        className="w-full bg-transparent text-[13px] outline-none placeholder:text-[var(--color-fg-subtle)]"
       />
       {listPos &&
         createPortal(
           <div
             ref={listRef}
             style={{ position: "fixed", top: listPos.top, left: listPos.left, width: listPos.width }}
-            className="z-50 mt-1 max-h-60 overflow-auto rounded border border-[var(--color-border)] bg-[var(--color-bg)] py-1 shadow-lg"
+            className="z-50 mt-1 max-h-60 overflow-auto rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-raised)] py-1 shadow-[var(--shadow-lg)]"
           >
             {filtered.map((c) => (
               <button
                 key={c.id}
                 type="button"
                 onClick={() => toggleChoice(c)}
-                className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
+                className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-[13px] hover:bg-[var(--color-surface-hover)]"
               >
-                <span className="w-3 shrink-0">{selected.includes(c.id) ? "✓" : ""}</span>
-                <span className="truncate rounded bg-black/5 px-1.5 py-0.5 text-xs dark:bg-white/10">{c.name}</span>
+                <span className="flex w-4 shrink-0 items-center justify-center text-[var(--color-accent)]">
+                  {selected.includes(c.id) && <CheckSquareIcon width={13} height={13} />}
+                </span>
+                <span className="truncate rounded-full px-2 py-0.5 text-[12px] font-medium" style={chipStyle(c.id)}>
+                  {c.name}
+                </span>
               </button>
             ))}
             {canAddOption && (
               <button
                 type="button"
                 onClick={addOption}
-                className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm text-[var(--color-muted)] hover:bg-black/5 dark:hover:bg-white/10"
+                className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-[13px] text-[var(--color-fg-muted)] hover:bg-[var(--color-surface-hover)]"
               >
+                <ListPlusIcon width={13} height={13} className="shrink-0" />
                 Add option:
-                <span className="truncate rounded bg-black/5 px-1.5 py-0.5 text-xs dark:bg-white/10">
+                <span className="truncate rounded-full bg-[var(--color-surface-hover)] px-2 py-0.5 text-[12px] font-medium text-[var(--color-fg)]">
                   {query.trim()}
                 </span>
               </button>
             )}
             {filtered.length === 0 && !canAddOption && (
-              <div className="px-2 py-1.5 text-sm text-[var(--color-muted)]">No options yet — type to add one.</div>
+              <div className="px-2 py-1.5 text-[13px] text-[var(--color-fg-muted)]">
+                No options yet — type to add one.
+              </div>
             )}
           </div>,
           document.body,

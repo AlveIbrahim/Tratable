@@ -11,11 +11,12 @@ import { useCreateRecord, useDeleteRecord, useRecords, useUpdateRecord } from "@
 import { useGridStore } from "@/lib/grid-store";
 import { CellDisplay, CellEditor } from "./cell";
 import { AddFieldButton } from "./add-field-button";
+import { DownloadIcon, FieldTypeIcon, PlusIcon, TrashIcon, XIcon } from "@/components/ui/icons";
 
-const ROW_HEIGHT = 32;
+const ROW_HEIGHT = 34;
 const DEFAULT_COL_WIDTH = 180;
 const MIN_COL_WIDTH = 80;
-const ROW_HEADER_WIDTH = 44;
+const ROW_HEADER_WIDTH = 46;
 
 /** Per-field column widths, resizable by dragging the header's right edge
  * (like Airtable/Excel). Persisted to localStorage per table so a reload
@@ -191,12 +192,12 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
   const gridWidth = ROW_HEADER_WIDTH + fields.reduce((sum, f) => sum + getWidth(f.id), 0) + DEFAULT_COL_WIDTH;
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-[var(--color-bg)]">
       {fieldError && (
-        <div className="flex items-center justify-between border-b border-red-200 bg-red-50 px-3 py-1.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+        <div className="flex items-center justify-between border-b border-[var(--color-danger)]/20 bg-[var(--color-danger-soft)] px-3 py-1.5 text-[13px] text-[var(--color-danger)]">
           {fieldError}
-          <button onClick={() => setFieldError(null)} className="px-2">
-            ✕
+          <button onClick={() => setFieldError(null)} className="rounded p-0.5 hover:bg-black/5">
+            <XIcon width={13} height={13} />
           </button>
         </div>
       )}
@@ -208,23 +209,24 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
       >
         <div style={{ width: gridWidth, minWidth: "100%" }}>
           {/* Header row */}
-          <div className="sticky top-0 z-10 flex border-b border-[var(--color-border)] bg-[var(--color-bg)]">
+          <div className="sticky top-0 z-10 flex border-b border-[var(--color-border)] bg-[var(--color-surface)]">
             <div style={{ width: ROW_HEADER_WIDTH }} className="shrink-0 border-r border-[var(--color-border)]" />
             {fields.map((f) => (
               <div
                 key={f.id}
                 style={{ width: getWidth(f.id) }}
-                className="group/header relative flex shrink-0 items-center justify-between gap-1 border-r border-[var(--color-border)] px-2 py-1.5 text-xs font-medium text-[var(--color-muted)]"
+                className="group/header relative flex shrink-0 items-center gap-1.5 border-r border-[var(--color-border)] px-2.5 py-2 text-[12px] font-medium text-[var(--color-fg-muted)]"
                 title={f.name}
               >
+                <FieldTypeIcon type={f.type} width={13} height={13} className="shrink-0 opacity-70" />
                 <span className="truncate">{f.name}</span>
                 {f.id !== table?.primary_field_id && (
                   <button
                     onClick={() => onDeleteField(f)}
                     title="Delete field"
-                    className="hidden shrink-0 text-red-500 hover:text-red-400 group-hover/header:block"
+                    className="ml-auto hidden shrink-0 rounded p-0.5 text-[var(--color-fg-subtle)] hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)] group-hover/header:block"
                   >
-                    ×
+                    <XIcon width={12} height={12} />
                   </button>
                 )}
                 <ColumnResizeHandle width={getWidth(f.id)} onResize={(w) => setWidth(f.id, w)} />
@@ -250,19 +252,19 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
                     height: ROW_HEIGHT,
                     transform: `translateY(${virtualRow.start}px)`,
                   }}
-                  className="flex border-b border-[var(--color-border)]"
+                  className="group/row flex border-b border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
                 >
                   <div
                     style={{ width: ROW_HEADER_WIDTH }}
-                    className="group flex shrink-0 items-center justify-center border-r border-[var(--color-border)] text-xs text-[var(--color-muted)]"
+                    className="flex shrink-0 items-center justify-center border-r border-[var(--color-border)] text-[11.5px] text-[var(--color-fg-subtle)]"
                   >
-                    <span className="group-hover:hidden">{virtualRow.index + 1}</span>
+                    <span className="group-hover/row:hidden">{virtualRow.index + 1}</span>
                     <button
-                      className="hidden text-red-500 group-hover:block"
+                      className="hidden rounded p-0.5 text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] group-hover/row:block"
                       onClick={() => deleteRecord.mutate(record.id)}
                       title="Delete row"
                     >
-                      ×
+                      <TrashIcon width={12} height={12} />
                     </button>
                   </div>
                   {fields.map((f) => {
@@ -290,8 +292,10 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
                           setActive(record.id, f.id);
                           startEditing();
                         }}
-                        className={`relative shrink-0 truncate border-r border-[var(--color-border)] px-2 py-1 text-sm ${
-                          isActive ? "ring-1 ring-inset ring-[var(--color-accent)]" : ""
+                        className={`relative flex shrink-0 items-center truncate border-r border-[var(--color-border)] px-2.5 text-[13px] ${
+                          isActive
+                            ? "z-[1] bg-[var(--color-surface)] ring-2 ring-inset ring-[var(--color-accent)]"
+                            : ""
                         }`}
                       >
                         {isEditing ? (
@@ -314,18 +318,20 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
           </div>
         </div>
       </div>
-      <div className="flex items-center justify-between border-t border-[var(--color-border)]">
+      <div className="flex items-center justify-between border-t border-[var(--color-border)] bg-[var(--color-surface)]">
         <button
           onClick={onAddRow}
           disabled={createRecord.isPending}
-          className="flex-1 px-3 py-2 text-left text-sm text-[var(--color-muted)] hover:bg-black/5 dark:hover:bg-white/5"
+          className="flex flex-1 items-center gap-1.5 px-3 py-2 text-left text-[12.5px] text-[var(--color-fg-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-fg)]"
         >
-          + Add row
+          <PlusIcon width={13} height={13} />
+          Add row
         </button>
         <button
           onClick={() => downloadFile(`/tables/${tableId}/export`, `${tableId}.csv`)}
-          className="shrink-0 px-3 py-2 text-sm text-[var(--color-muted)] hover:bg-black/5 dark:hover:bg-white/5"
+          className="flex shrink-0 items-center gap-1.5 px-3 py-2 text-[12.5px] text-[var(--color-fg-muted)] transition-colors hover:bg-[var(--color-surface-hover)] hover:text-[var(--color-fg)]"
         >
+          <DownloadIcon width={13} height={13} />
           Export CSV
         </button>
       </div>

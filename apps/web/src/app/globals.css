@@ -2,39 +2,137 @@
 
 :root {
   color-scheme: light;
-  --color-bg: #ffffff;
-  --color-fg: #1a1a1a;
-  --color-border: #e2e2e2;
-  --color-muted: #6b7280;
-  --color-accent: #2563eb;
+
+  /* Surfaces — layered, not flat: page < panel < raised (card/menu/modal) */
+  --color-bg: #f7f7f8;
+  --color-surface: #ffffff;
+  --color-surface-hover: #f1f1f3;
+  --color-raised: #ffffff;
+
+  /* Text hierarchy */
+  --color-fg: #1c1d21;
+  --color-fg-muted: #62636c;
+  --color-fg-subtle: #93949c;
+
+  --color-border: #e6e6e9;
+  --color-border-strong: #d4d4d9;
+
+  --color-accent: #3b6cf6;
+  --color-accent-hover: #2f57d4;
   --color-accent-fg: #ffffff;
-  --color-danger: #dc2626;
-  --grid-row-height: 32px;
+  --color-accent-soft: #eaf0ff;
+
+  --color-danger: #e5484d;
+  --color-danger-soft: #fdecec;
+  --color-success: #1a9e6b;
+  --color-success-soft: #e8f8f1;
+
+  --shadow-sm: 0 1px 2px rgba(16, 16, 20, 0.06);
+  --shadow-md: 0 4px 12px rgba(16, 16, 20, 0.08), 0 1px 3px rgba(16, 16, 20, 0.06);
+  --shadow-lg: 0 12px 32px rgba(16, 16, 20, 0.14), 0 2px 8px rgba(16, 16, 20, 0.08);
+
+  --radius-sm: 6px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --grid-row-height: 34px;
+
+  /* Chip palette (select/multi-select tags) — light mode. Each field's
+   * choices get a color assigned deterministically by hashing the choice
+   * id (see lib/colors.ts), so the same choice always reads the same
+   * color everywhere without storing a color per choice. */
+  --chip-1-bg: #e0e7ff; --chip-1-fg: #3730a3;
+  --chip-2-bg: #dbeafe; --chip-2-fg: #1e40af;
+  --chip-3-bg: #cffafe; --chip-3-fg: #155e75;
+  --chip-4-bg: #d1fae5; --chip-4-fg: #065f46;
+  --chip-5-bg: #fef9c3; --chip-5-fg: #854d0e;
+  --chip-6-bg: #fed7aa; --chip-6-fg: #9a3412;
+  --chip-7-bg: #fecdd3; --chip-7-fg: #9f1239;
+  --chip-8-bg: #f5d0fe; --chip-8-fg: #86198f;
+  --chip-9-bg: #e5e7eb; --chip-9-fg: #374151;
+  --chip-10-bg: #ccfbf1; --chip-10-fg: #115e59;
 }
 
-/* Without an explicit color-scheme, the page painting dark while native
- * controls (select popups, checkboxes, date pickers) stay light-themed is
- * exactly the "can't read the dropdown" bug — the browser has no signal
- * that this page wants dark controls, so it renders them with default
- * light-OS chrome regardless of our own dark palette. */
 @media (prefers-color-scheme: dark) {
   :root {
     color-scheme: dark;
-    --color-bg: #0f1115;
-    --color-fg: #e5e7eb;
-    --color-border: #262a33;
-    --color-muted: #9ca3af;
-    --color-accent: #3b82f6;
-    --color-accent-fg: #0f1115;
+
+    --color-bg: #0b0c0f;
+    --color-surface: #131417;
+    --color-surface-hover: #1b1c21;
+    --color-raised: #1a1b1f;
+
+    --color-fg: #eceef1;
+    --color-fg-muted: #9a9ba3;
+    --color-fg-subtle: #6c6d76;
+
+    --color-border: #24252b;
+    --color-border-strong: #34353d;
+
+    --color-accent: #5b82ff;
+    --color-accent-hover: #7196ff;
+    --color-accent-fg: #08101f;
+    --color-accent-soft: #17213f;
+
+    --color-danger: #ff6369;
+    --color-danger-soft: #3b1719;
+    --color-success: #2fd191;
+    --color-success-soft: #0f2a20;
+
+    --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+    --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.45), 0 1px 4px rgba(0, 0, 0, 0.3);
+    --shadow-lg: 0 16px 40px rgba(0, 0, 0, 0.55), 0 2px 10px rgba(0, 0, 0, 0.35);
+
+    --chip-1-bg: #2a2a5c; --chip-1-fg: #c7d2fe;
+    --chip-2-bg: #1e3a6e; --chip-2-fg: #bfdbfe;
+    --chip-3-bg: #164654; --chip-3-fg: #a5f3fc;
+    --chip-4-bg: #0f3d31; --chip-4-fg: #a7f3d0;
+    --chip-5-bg: #453711; --chip-5-fg: #fef08a;
+    --chip-6-bg: #4a2a10; --chip-6-fg: #fed7aa;
+    --chip-7-bg: #4a1420; --chip-7-fg: #fecdd3;
+    --chip-8-bg: #451a4d; --chip-8-fg: #f5d0fe;
+    --chip-9-bg: #2b2c33; --chip-9-fg: #d1d2d8;
+    --chip-10-bg: #0e3d38; --chip-10-fg: #99f6e4;
   }
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  height: 100%;
 }
 
 body {
   background: var(--color-bg);
   color: var(--color-fg);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  font-size: 13.5px;
 }
 
-* {
-  box-sizing: border-box;
+::selection {
+  background: var(--color-accent-soft);
+}
+
+/* A visible, on-brand focus ring instead of the browser default — kept for
+ * keyboard navigation, not shown on mouse clicks. */
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 1px;
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-border-strong);
+  border-radius: 8px;
+  border: 2px solid var(--color-bg);
 }
