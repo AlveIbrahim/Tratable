@@ -1,6 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import type { FieldSummary } from "@/lib/hooks/use-fields";
 import { useUpdateField } from "@/lib/hooks/use-fields";
 
@@ -16,6 +17,15 @@ interface Choice {
  * patches the field's options (so it's available to every future row, not
  * just this cell) and selects it immediately; no separate "field settings"
  * screen is needed to grow a select field's option list over time.
+ *
+ * The options list is rendered through a portal into document.body, NOT
+ * inline under the cell. A grid cell's wrapper uses Tailwind's `truncate`
+ * (overflow: hidden) to keep long text from blowing out the row height —
+ * exactly the thing that was silently clipping this list to invisible
+ * for every real user, even though it existed in the DOM and looked fine
+ * to DOM inspection. A portal escapes that ancestor entirely; position is
+ * computed from the input's own on-screen rect instead of relying on
+ * normal document flow.
  */
 export function SelectCellEditor({
   field,
@@ -33,8 +43,9 @@ export function SelectCellEditor({
   onCancel: () => void;
 }) {
   const updateField = useUpdateField(tableId);
-  const rootRef = useRef<HTMLDivElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const anchorRef = useRef<HTMLInputElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+  const [listPos, setListPos] = useState<{ top: number; left: number; width: number } | null>(null);
 
   // Local, optimistic copy of the field's choices — updated immediately when
   // a new one is added here, rather than waiting on a refetch of `fields`.
@@ -44,15 +55,21 @@ export function SelectCellEditor({
     multi ? ((value as string[]) ?? []) : value ? [value as string] : [],
   );
 
+  useLayoutEffect(() => {
+    const rect = anchorRef.current?.getBoundingClientRect();
+    if (rect) setListPos({ top: rect.bottom, left: rect.left, width: Math.max(rect.width, 224) });
+  }, []);
+
   useEffect(() => {
-    inputRef.current?.focus();
+    anchorRef.current?.focus();
   }, []);
 
   useEffect(() => {
     function onOutside(e: MouseEvent) {
-      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
-        commitAndClose();
-      }
+      const target = e.target as Node;
+      const insideAnchor = anchorRef.current?.contains(target);
+      const insideList = listRef.current?.contains(target);
+      if (!insideAnchor && !insideList) commitAndClose();
     }
     document.addEventListener("mousedown", onOutside);
     return () => document.removeEventListener("mousedown", onOutside);
@@ -106,44 +123,51 @@ export function SelectCellEditor({
   }
 
   return (
-    <div
-      ref={rootRef}
-      className="absolute left-0 top-0 z-30 w-64 rounded border border-[var(--color-border)] bg-[var(--color-bg)] shadow-lg"
-    >
+    <>
       <input
-        ref={inputRef}
+        ref={anchorRef}
         value={query}
         onChange={(e) => setQuery(e.target.value)}
         onKeyDown={onKeyDown}
         placeholder="Find an option"
-        className="w-full border-b border-[var(--color-border)] bg-transparent px-2 py-1.5 text-sm outline-none"
+        className="w-full bg-transparent text-sm outline-none"
       />
-      <div className="max-h-52 overflow-auto py-1">
-        {filtered.map((c) => (
-          <button
-            key={c.id}
-            type="button"
-            onClick={() => toggleChoice(c)}
-            className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
+      {listPos &&
+        createPortal(
+          <div
+            ref={listRef}
+            style={{ position: "fixed", top: listPos.top, left: listPos.left, width: listPos.width }}
+            className="z-50 mt-1 max-h-60 overflow-auto rounded border border-[var(--color-border)] bg-[var(--color-bg)] py-1 shadow-lg"
           >
-            <span className="w-3 shrink-0">{selected.includes(c.id) ? "✓" : ""}</span>
-            <span className="truncate rounded bg-black/5 px-1.5 py-0.5 text-xs dark:bg-white/10">{c.name}</span>
-          </button>
-        ))}
-        {canAddOption && (
-          <button
-            type="button"
-            onClick={addOption}
-            className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm text-[var(--color-muted)] hover:bg-black/5 dark:hover:bg-white/10"
-          >
-            Add option:
-            <span className="truncate rounded bg-black/5 px-1.5 py-0.5 text-xs dark:bg-white/10">{query.trim()}</span>
-          </button>
+            {filtered.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => toggleChoice(c)}
+                className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm hover:bg-black/5 dark:hover:bg-white/10"
+              >
+                <span className="w-3 shrink-0">{selected.includes(c.id) ? "✓" : ""}</span>
+                <span className="truncate rounded bg-black/5 px-1.5 py-0.5 text-xs dark:bg-white/10">{c.name}</span>
+              </button>
+            ))}
+            {canAddOption && (
+              <button
+                type="button"
+                onClick={addOption}
+                className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-sm text-[var(--color-muted)] hover:bg-black/5 dark:hover:bg-white/10"
+              >
+                Add option:
+                <span className="truncate rounded bg-black/5 px-1.5 py-0.5 text-xs dark:bg-white/10">
+                  {query.trim()}
+                </span>
+              </button>
+            )}
+            {filtered.length === 0 && !canAddOption && (
+              <div className="px-2 py-1.5 text-sm text-[var(--color-muted)]">No options yet — type to add one.</div>
+            )}
+          </div>,
+          document.body,
         )}
-        {filtered.length === 0 && !canAddOption && (
-          <div className="px-2 py-1.5 text-sm text-[var(--color-muted)]">No options yet — type to add one.</div>
-        )}
-      </div>
-    </div>
+    </>
   );
 }

@@ -19,46 +19,22 @@ const FIELD_TYPE_OPTIONS: { value: FieldType; label: string }[] = [
   { value: "phone", label: "Phone" },
 ];
 
-const SELECT_TYPES: FieldType[] = ["singleSelect", "multiSelect"];
-
-function parseChoiceNames(raw: string): string[] {
-  const seen = new Set<string>();
-  const names: string[] = [];
-  for (const part of raw.split(",")) {
-    const name = part.trim();
-    if (!name || seen.has(name.toLowerCase())) continue;
-    seen.add(name.toLowerCase());
-    names.push(name);
-  }
-  return names;
-}
-
 export function AddFieldButton({ tableId }: { tableId: string }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState("");
   const [type, setType] = useState<FieldType>("singleLineText");
-  // A select field created with no choices has nothing to ever pick — the
-  // cell editor renders an empty list forever until someone edits the
-  // field's options later (no such UI exists yet). Asking for choices up
-  // front at creation time is what makes select types usable at all.
-  const [choicesRaw, setChoicesRaw] = useState("");
   const createField = useCreateField(tableId);
 
-  const isSelectType = SELECT_TYPES.includes(type);
-  const choiceNames = parseChoiceNames(choicesRaw);
-
+  // Select fields start with zero choices — no options form here. The cell
+  // editor (select-cell-editor.tsx) grows the list on demand: type a value
+  // that doesn't exist yet, hit "Add option", and it's added to the field
+  // for every future row. That's the only place choices are defined, so
+  // creating the field itself needs nothing beyond a name and a type.
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!name.trim()) return;
-    if (isSelectType && choiceNames.length === 0) return;
-
-    const options = isSelectType
-      ? { choices: choiceNames.map((n) => ({ id: crypto.randomUUID(), name: n })) }
-      : undefined;
-
-    await createField.mutateAsync({ name: name.trim(), type, options });
+    await createField.mutateAsync({ name: name.trim(), type });
     setName("");
-    setChoicesRaw("");
     setOpen(false);
   }
 
@@ -76,7 +52,7 @@ export function AddFieldButton({ tableId }: { tableId: string }) {
   return (
     <form
       onSubmit={onSubmit}
-      className="absolute z-20 w-72 space-y-2 rounded border border-[var(--color-border)] bg-[var(--color-bg)] p-3 shadow-lg"
+      className="absolute z-20 w-64 space-y-2 rounded border border-[var(--color-border)] bg-[var(--color-bg)] p-3 shadow-lg"
     >
       <input
         autoFocus
@@ -86,32 +62,13 @@ export function AddFieldButton({ tableId }: { tableId: string }) {
         className="w-full rounded border border-[var(--color-border)] bg-transparent px-2 py-1.5 text-sm outline-none focus:border-[var(--color-accent)]"
       />
       <Select value={type} onChange={(v) => setType(v as FieldType)} options={FIELD_TYPE_OPTIONS} />
-      {isSelectType && (
-        <div className="space-y-1">
-          <input
-            placeholder="Options, comma separated (e.g. Open, Closed, Pending)"
-            value={choicesRaw}
-            onChange={(e) => setChoicesRaw(e.target.value)}
-            className="w-full rounded border border-[var(--color-border)] bg-transparent px-2 py-1.5 text-sm outline-none focus:border-[var(--color-accent)]"
-          />
-          {choiceNames.length > 0 && (
-            <div className="flex flex-wrap gap-1">
-              {choiceNames.map((n) => (
-                <span key={n} className="rounded bg-black/5 px-1.5 py-0.5 text-xs dark:bg-white/10">
-                  {n}
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
       <div className="flex justify-end gap-2">
         <button type="button" onClick={() => setOpen(false)} className="px-2 py-1 text-sm text-[var(--color-muted)]">
           Cancel
         </button>
         <button
           type="submit"
-          disabled={createField.isPending || (isSelectType && choiceNames.length === 0)}
+          disabled={createField.isPending || !name.trim()}
           className="rounded bg-[var(--color-accent)] px-3 py-1 text-sm font-medium text-[var(--color-accent-fg)] disabled:opacity-50"
         >
           Create
