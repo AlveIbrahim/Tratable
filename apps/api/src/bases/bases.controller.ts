@@ -1,16 +1,21 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiParam, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
+import type { Response } from "express";
 import { createBaseSchema, updateBaseSchema } from "@tratable/shared";
 import { RequireRole } from "../common/decorators/require-role.decorator";
 import { ResourceParam } from "../common/decorators/resource-param.decorator";
 import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe";
+import { ExportService } from "../export/export.service";
 import { BasesService } from "./bases.service";
 
 @ApiTags("bases")
 @ApiBearerAuth("access-token")
 @Controller("bases")
 export class BasesController {
-  constructor(private readonly bases: BasesService) {}
+  constructor(
+    private readonly bases: BasesService,
+    private readonly exportService: ExportService,
+  ) {}
 
   @Post()
   @RequireRole("editor")
@@ -76,5 +81,18 @@ export class BasesController {
   @ApiParam({ name: "baseId" })
   remove(@Param("baseId") baseId: string) {
     return this.bases.softDelete(baseId);
+  }
+
+  @Get(":baseId/export")
+  @RequireRole("viewer")
+  @ResourceParam("base", "baseId")
+  @ApiOperation({ summary: "Stream a zip containing one unfiltered CSV per table in the base" })
+  @ApiParam({ name: "baseId" })
+  async export(@Param("baseId") baseId: string, @Res() res: Response) {
+    const { stream, baseName } = await this.exportService.streamBaseZip(baseId);
+    const safeName = baseName.replace(/[/\\?%*:|"<>]/g, "_");
+    res.setHeader("Content-Type", "application/zip");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}.zip"`);
+    stream.pipe(res);
   }
 }

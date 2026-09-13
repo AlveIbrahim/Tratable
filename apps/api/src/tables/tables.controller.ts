@@ -1,16 +1,21 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiParam, ApiOperation, ApiQuery, ApiTags } from "@nestjs/swagger";
+import type { Response } from "express";
 import { createTableSchema, updateTableSchema } from "@tratable/shared";
 import { RequireRole } from "../common/decorators/require-role.decorator";
 import { ResourceParam } from "../common/decorators/resource-param.decorator";
 import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe";
+import { ExportService } from "../export/export.service";
 import { TablesService } from "./tables.service";
 
 @ApiTags("tables")
 @ApiBearerAuth("access-token")
 @Controller("tables")
 export class TablesController {
-  constructor(private readonly tables: TablesService) {}
+  constructor(
+    private readonly tables: TablesService,
+    private readonly exportService: ExportService,
+  ) {}
 
   @Post()
   @RequireRole("editor")
@@ -76,5 +81,28 @@ export class TablesController {
   @ApiParam({ name: "tableId" })
   remove(@Param("tableId") tableId: string) {
     return this.tables.softDelete(tableId);
+  }
+
+  @Get(":tableId/export")
+  @RequireRole("viewer")
+  @ResourceParam("table", "tableId")
+  @ApiOperation({
+    summary: "Stream the table as CSV",
+    description:
+      "Pass viewId to honor that view's filters, sort, field order, and hidden fields — otherwise exports " +
+      "every visible field in every row, unfiltered. Streamed in batches; memory stays flat regardless of table size.",
+  })
+  @ApiParam({ name: "tableId" })
+  @ApiQuery({ name: "viewId", required: false })
+  async export(
+    @Param("tableId") tableId: string,
+    @Query("viewId") viewId: string | undefined,
+    @Res() res: Response,
+  ) {
+    const { stream, tableName } = await this.exportService.streamTableCsv(tableId, viewId);
+    const safeName = tableName.replace(/[/\\?%*:|"<>]/g, "_");
+    res.setHeader("Content-Type", "text/csv");
+    res.setHeader("Content-Disposition", `attachment; filename="${safeName}.csv"`);
+    stream.pipe(res);
   }
 }

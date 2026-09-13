@@ -88,3 +88,33 @@ export const api = {
   patch: <T>(path: string, body?: unknown) => apiFetch<T>(path, { method: "PATCH", body }),
   delete: <T>(path: string) => apiFetch<T>(path, { method: "DELETE" }),
 };
+
+/** Downloads a file from an authenticated endpoint (CSV/zip exports) by
+ * fetching it with the bearer token attached, then triggering a save via a
+ * throwaway object-URL anchor — a plain <a href> can't carry an
+ * Authorization header, so browser-native navigation to these endpoints
+ * would always 401. */
+export async function downloadFile(path: string, fallbackName: string): Promise<void> {
+  const token = useAuthStore.getState().accessToken;
+  const res = await fetch(`/api${path}`, {
+    credentials: "include",
+    headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+  });
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({ message: res.statusText }));
+    throw new ApiError(res.status, body.message ?? "Download failed");
+  }
+  const disposition = res.headers.get("Content-Disposition") ?? "";
+  const match = /filename="([^"]+)"/.exec(disposition);
+  const filename = match?.[1] ?? fallbackName;
+
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}

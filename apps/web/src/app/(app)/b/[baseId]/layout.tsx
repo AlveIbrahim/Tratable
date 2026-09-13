@@ -7,6 +7,7 @@ import clsx from "clsx";
 import { useBase } from "@/lib/hooks/use-bases";
 import { useCreateTable, useDeleteTable, useTables } from "@/lib/hooks/use-tables";
 import { ImportWizard } from "@/components/import/import-wizard";
+import { downloadFile } from "@/lib/api-client";
 
 export default function BaseLayout({
   children,
@@ -87,6 +88,12 @@ export default function BaseLayout({
             className="shrink-0 rounded px-3 py-1.5 text-sm text-[var(--color-muted)] hover:bg-black/5 dark:hover:bg-white/5"
           >
             Import CSV
+          </button>
+          <button
+            onClick={() => downloadFile(`/bases/${baseId}/export`, `${base?.name ?? "base"}.zip`)}
+            className="shrink-0 rounded px-3 py-1.5 text-sm text-[var(--color-muted)] hover:bg-black/5 dark:hover:bg-white/5"
+          >
+            Export base
           </button>
         </div>
       </header>

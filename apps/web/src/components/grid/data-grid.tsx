@@ -5,6 +5,7 @@ import { useVirtualizer } from "@tanstack/react-virtual";
 import type { RecordDto } from "@tratable/shared";
 import type { FieldSummary } from "@/lib/hooks/use-fields";
 import { useDeleteField } from "@/lib/hooks/use-fields";
+import { downloadFile } from "@/lib/api-client";
 import { useTable } from "@/lib/hooks/use-tables";
 import { useCreateRecord, useDeleteRecord, useRecords, useUpdateRecord } from "@/lib/hooks/use-records";
 import { useGridStore } from "@/lib/grid-store";
@@ -313,13 +314,21 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
           </div>
         </div>
       </div>
-      <button
-        onClick={onAddRow}
-        disabled={createRecord.isPending}
-        className="border-t border-[var(--color-border)] px-3 py-2 text-left text-sm text-[var(--color-muted)] hover:bg-black/5 dark:hover:bg-white/5"
-      >
-        + Add row
-      </button>
+      <div className="flex items-center justify-between border-t border-[var(--color-border)]">
+        <button
+          onClick={onAddRow}
+          disabled={createRecord.isPending}
+          className="flex-1 px-3 py-2 text-left text-sm text-[var(--color-muted)] hover:bg-black/5 dark:hover:bg-white/5"
+        >
+          + Add row
+        </button>
+        <button
+          onClick={() => downloadFile(`/tables/${tableId}/export`, `${tableId}.csv`)}
+          className="shrink-0 px-3 py-2 text-sm text-[var(--color-muted)] hover:bg-black/5 dark:hover:bg-white/5"
+        >
+          Export CSV
+        </button>
+      </div>
     </div>
   );
 }
