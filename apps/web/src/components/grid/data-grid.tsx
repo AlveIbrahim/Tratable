@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { RecordDto } from "@tratable/shared";
 import type { FieldSummary } from "@/lib/hooks/use-fields";
@@ -10,8 +10,81 @@ import { CellDisplay, CellEditor } from "./cell";
 import { AddFieldButton } from "./add-field-button";
 
 const ROW_HEIGHT = 32;
-const COL_WIDTH = 180;
+const DEFAULT_COL_WIDTH = 180;
+const MIN_COL_WIDTH = 80;
 const ROW_HEADER_WIDTH = 44;
+
+/** Per-field column widths, resizable by dragging the header's right edge
+ * (like Airtable/Excel). Persisted to localStorage per table so a reload
+ * doesn't reset the layout — full server-side persistence into the view's
+ * config is a reasonable follow-up once views support partial-field patches
+ * from the grid rather than just the builder. */
+function useColumnWidths(tableId: string) {
+  const storageKey = `tratable:col-widths:${tableId}`;
+  const [widths, setWidths] = useState<Record<string, number>>({});
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(storageKey);
+      setWidths(raw ? JSON.parse(raw) : {});
+    } catch {
+      setWidths({});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [storageKey]);
+
+  const setWidth = useCallback(
+    (fieldId: string, width: number) => {
+      setWidths((prev) => {
+        const next = { ...prev, [fieldId]: width };
+        try {
+          localStorage.setItem(storageKey, JSON.stringify(next));
+        } catch {
+          // best-effort only — a private window or full storage shouldn't break resizing
+        }
+        return next;
+      });
+    },
+    [storageKey],
+  );
+
+  const getWidth = useCallback((fieldId: string) => widths[fieldId] ?? DEFAULT_COL_WIDTH, [widths]);
+  return { getWidth, setWidth };
+}
+
+/** Drag handle on a column header's right edge. Pointer events (not mouse
+ * events) so it works the same with touch/pen, and setPointerCapture keeps
+ * receiving move events even if the cursor leaves the handle mid-drag. */
+function ColumnResizeHandle({ width, onResize }: { width: number; onResize: (width: number) => void }) {
+  const startRef = useRef<{ x: number; width: number } | null>(null);
+
+  function onPointerDown(e: React.PointerEvent) {
+    e.preventDefault();
+    e.stopPropagation();
+    startRef.current = { x: e.clientX, width };
+    (e.target as HTMLElement).setPointerCapture(e.pointerId);
+  }
+
+  function onPointerMove(e: React.PointerEvent) {
+    if (!startRef.current) return;
+    const delta = e.clientX - startRef.current.x;
+    onResize(Math.max(MIN_COL_WIDTH, startRef.current.width + delta));
+  }
+
+  function onPointerUp(e: React.PointerEvent) {
+    startRef.current = null;
+    (e.target as HTMLElement).releasePointerCapture(e.pointerId);
+  }
+
+  return (
+    <div
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={onPointerUp}
+      className="absolute -right-1 top-0 z-10 h-full w-2 cursor-col-resize touch-none select-none hover:bg-[var(--color-accent)]/40"
+    />
+  );
+}
 
 export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSummary[] }) {
   const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useRecords(tableId);
@@ -20,6 +93,7 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
   const createRecord = useCreateRecord(tableId);
   const updateRecord = useUpdateRecord(tableId);
   const deleteRecord = useDeleteRecord(tableId);
+  const { getWidth, setWidth } = useColumnWidths(tableId);
 
   const { activeRowId, activeFieldId, mode, setActive, startEditing, stopEditing } = useGridStore();
 
@@ -95,7 +169,7 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
     setActive(rec.id, fields[0]?.id ?? null);
   }
 
-  const gridWidth = ROW_HEADER_WIDTH + fields.length * COL_WIDTH;
+  const gridWidth = ROW_HEADER_WIDTH + fields.reduce((sum, f) => sum + getWidth(f.id), 0) + DEFAULT_COL_WIDTH;
 
   return (
     <div className="flex h-full flex-col">
@@ -112,14 +186,15 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
             {fields.map((f) => (
               <div
                 key={f.id}
-                style={{ width: COL_WIDTH }}
-                className="shrink-0 truncate border-r border-[var(--color-border)] px-2 py-1.5 text-xs font-medium text-[var(--color-muted)]"
+                style={{ width: getWidth(f.id) }}
+                className="relative shrink-0 truncate border-r border-[var(--color-border)] px-2 py-1.5 text-xs font-medium text-[var(--color-muted)]"
                 title={f.name}
               >
                 {f.name}
+                <ColumnResizeHandle width={getWidth(f.id)} onResize={(w) => setWidth(f.id, w)} />
               </div>
             ))}
-            <div style={{ width: COL_WIDTH }} className="shrink-0">
+            <div style={{ width: DEFAULT_COL_WIDTH }} className="shrink-0">
               <AddFieldButton tableId={tableId} />
             </div>
           </div>
@@ -160,7 +235,7 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
                     return (
                       <div
                         key={f.id}
-                        style={{ width: COL_WIDTH }}
+                        style={{ width: getWidth(f.id) }}
                         onClick={() => setActive(record.id, f.id)}
                         onDoubleClick={() => {
                           setActive(record.id, f.id);

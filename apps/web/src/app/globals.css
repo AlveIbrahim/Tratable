@@ -1,6 +1,7 @@
 @import "tailwindcss";
 
 :root {
+  color-scheme: light;
   --color-bg: #ffffff;
   --color-fg: #1a1a1a;
   --color-border: #e2e2e2;
@@ -11,8 +12,14 @@
   --grid-row-height: 32px;
 }
 
+/* Without an explicit color-scheme, the page painting dark while native
+ * controls (select popups, checkboxes, date pickers) stay light-themed is
+ * exactly the "can't read the dropdown" bug — the browser has no signal
+ * that this page wants dark controls, so it renders them with default
+ * light-OS chrome regardless of our own dark palette. */
 @media (prefers-color-scheme: dark) {
   :root {
+    color-scheme: dark;
     --color-bg: #0f1115;
     --color-fg: #e5e7eb;
     --color-border: #262a33;
