@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { FieldSummary } from "@/lib/hooks/use-fields";
+import { Select } from "@/components/ui/select";
 
 interface SelectChoice {
   id: string;
@@ -101,20 +102,14 @@ export function CellEditor({
   if (field.type === "singleSelect") {
     const choices = (field.options.choices as SelectChoice[]) ?? [];
     return (
-      <select
-        ref={ref as any}
-        defaultValue={(value as string) ?? ""}
-        onBlur={(e) => onCommit(e.target.value || null)}
-        onKeyDown={onKeyDown}
-        className="w-full bg-transparent text-sm outline-none"
-      >
-        <option value="" />
-        {choices.map((c) => (
-          <option key={c.id} value={c.id}>
-            {c.name}
-          </option>
-        ))}
-      </select>
+      <Select
+        autoOpen
+        value={(value as string) ?? ""}
+        onChange={(v) => onCommit(v || null)}
+        onClose={onCancel}
+        placeholder=""
+        options={choices.map((c) => ({ value: c.id, label: c.name }))}
+      />
     );
   }
 

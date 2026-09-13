@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExecuteImportDto, FieldType, ImportColumnMapping } from "@tratable/shared";
 import type { TableSummary } from "@/lib/hooks/use-tables";
 import { useFields } from "@/lib/hooks/use-fields";
+import { Select } from "@/components/ui/select";
 import {
   useAnalyzeImport,
   useExecuteImport,
@@ -236,17 +237,12 @@ export function ImportWizard({
                                   onChange={(e) => updateMapping(idx, { fieldName: e.target.value })}
                                   className="w-28 rounded border border-[var(--color-border)] bg-transparent px-1.5 py-1 text-xs"
                                 />
-                                <select
-                                  value={m.fieldType}
-                                  onChange={(e) => updateMapping(idx, { fieldType: e.target.value as FieldType })}
-                                  className="rounded border border-[var(--color-border)] bg-transparent px-1.5 py-1 text-xs"
-                                >
-                                  {CREATABLE_TYPES.map((t) => (
-                                    <option key={t.value} value={t.value}>
-                                      {t.label}
-                                    </option>
-                                  ))}
-                                </select>
+                                <Select
+                                  className="w-36"
+                                  value={m.fieldType ?? "singleLineText"}
+                                  onChange={(v) => updateMapping(idx, { fieldType: v as FieldType })}
+                                  options={CREATABLE_TYPES}
+                                />
                               </div>
                             )}
                             {m.action === "mapToField" && (

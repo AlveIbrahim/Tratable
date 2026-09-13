@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { FieldType } from "@tratable/shared";
 import { useCreateField } from "@/lib/hooks/use-fields";
+import { Select } from "@/components/ui/select";
 
 const FIELD_TYPE_OPTIONS: { value: FieldType; label: string }[] = [
   { value: "singleLineText", label: "Single line text" },
@@ -55,17 +56,7 @@ export function AddFieldButton({ tableId }: { tableId: string }) {
         onChange={(e) => setName(e.target.value)}
         className="w-full rounded border border-[var(--color-border)] bg-transparent px-2 py-1.5 text-sm outline-none focus:border-[var(--color-accent)]"
       />
-      <select
-        value={type}
-        onChange={(e) => setType(e.target.value as FieldType)}
-        className="w-full rounded border border-[var(--color-border)] bg-transparent px-2 py-1.5 text-sm outline-none"
-      >
-        {FIELD_TYPE_OPTIONS.map((opt) => (
-          <option key={opt.value} value={opt.value}>
-            {opt.label}
-          </option>
-        ))}
-      </select>
+      <Select value={type} onChange={(v) => setType(v as FieldType)} options={FIELD_TYPE_OPTIONS} />
       <div className="flex justify-end gap-2">
         <button type="button" onClick={() => setOpen(false)} className="px-2 py-1 text-sm text-[var(--color-muted)]">
           Cancel
