@@ -109,7 +109,7 @@ export function ViewToolbar({
           onClick={() => filterPop.setOpen((v) => !v)}
         />
         {filterPop.open && (
-          <div className="absolute left-0 top-full z-30 mt-1 w-[420px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-raised)] p-3 shadow-[var(--shadow-lg)]">
+          <div className="absolute left-0 top-full z-30 mt-1 w-[440px] rounded-[var(--radius-md)] border border-[var(--color-border)] bg-[var(--color-raised)] p-3 shadow-[var(--shadow-lg)]">
             {conditions.length === 0 && (
               <p className="mb-2 text-[12.5px] text-[var(--color-fg-subtle)]">No filters applied to this view.</p>
             )}
@@ -119,12 +119,19 @@ export function ViewToolbar({
                 if (!field) return null;
                 const ops = OPS_BY_FIELD_TYPE[field.type];
                 return (
+                  // Every column below is `flex-1 min-w-0` (field/op split the
+                  // remaining space evenly, the value editor gets a bit more)
+                  // rather than a fixed px width — fixed widths across five
+                  // columns in a fixed-width popover don't reliably sum to fit
+                  // it, and the widest option (e.g. a long choice name in the
+                  // value dropdown) used to push itself and the trash button
+                  // right out past the popover's edge instead of truncating.
                   <div key={idx} className="flex items-center gap-1.5">
                     <span className="w-10 shrink-0 text-[12px] text-[var(--color-fg-subtle)]">
                       {idx === 0 ? "Where" : filterGroup.conjunction === "and" ? "and" : "or"}
                     </span>
                     <Select
-                      className="w-32 shrink-0"
+                      className="min-w-0 flex-1"
                       value={field.id}
                       onChange={(v) => {
                         const nf = fieldById(v)!;
@@ -136,7 +143,7 @@ export function ViewToolbar({
                       options={fields.map((f) => ({ value: f.id, label: f.name }))}
                     />
                     <Select
-                      className="w-32 shrink-0"
+                      className="min-w-0 flex-1"
                       value={cond.op}
                       onChange={(v) => {
                         const next = [...conditions];
@@ -146,20 +153,22 @@ export function ViewToolbar({
                       options={ops.map((op) => ({ value: op, label: OP_LABELS[op] }))}
                     />
                     {!NO_VALUE_OPS.has(cond.op) && (
-                      <FilterValueInput
-                        field={field}
-                        op={cond.op}
-                        value={cond.value}
-                        onChange={(value) => {
-                          const next = [...conditions];
-                          next[idx] = { ...cond, value };
-                          setConditions(next);
-                        }}
-                      />
+                      <div className="min-w-0 flex-[1.3]">
+                        <FilterValueInput
+                          field={field}
+                          op={cond.op}
+                          value={cond.value}
+                          onChange={(value) => {
+                            const next = [...conditions];
+                            next[idx] = { ...cond, value };
+                            setConditions(next);
+                          }}
+                        />
+                      </div>
                     )}
                     <button
                       onClick={() => setConditions(conditions.filter((_, i) => i !== idx))}
-                      className="ml-auto shrink-0 rounded p-1 text-[var(--color-fg-subtle)] hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)]"
+                      className="shrink-0 rounded p-1 text-[var(--color-fg-subtle)] hover:bg-[var(--color-danger-soft)] hover:text-[var(--color-danger)]"
                     >
                       <TrashIcon width={13} height={13} />
                     </button>

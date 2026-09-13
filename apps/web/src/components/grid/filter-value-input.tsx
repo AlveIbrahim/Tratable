@@ -31,7 +31,7 @@ export function FilterValueInput({
     const choices = (field.options.choices as Choice[]) ?? [];
     return (
       <Select
-        className="w-40"
+        className="w-full"
         value={(value as string) ?? ""}
         onChange={onChange}
         placeholder="Choose…"
@@ -52,7 +52,7 @@ export function FilterValueInput({
       return <span className="text-[12px] text-[var(--color-fg-subtle)]">No options to choose from yet</span>;
     }
     return (
-      <div className="flex max-w-52 flex-wrap gap-1">
+      <div className="flex w-full flex-wrap gap-1">
         {choices.map((c) => (
           <button
             key={c.id}
@@ -74,7 +74,7 @@ export function FilterValueInput({
         type="number"
         value={(value as number) ?? ""}
         onChange={(e) => onChange(e.target.value === "" ? undefined : Number(e.target.value))}
-        className="w-28 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-[12.5px] outline-none focus:border-[var(--color-accent)]"
+        className="w-full min-w-0 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-[12.5px] outline-none focus:border-[var(--color-accent)]"
       />
     );
   }
@@ -85,7 +85,7 @@ export function FilterValueInput({
         type={type === "dateTime" ? "datetime-local" : "date"}
         value={(value as string) ?? ""}
         onChange={(e) => onChange(e.target.value || undefined)}
-        className="rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-[12.5px] outline-none focus:border-[var(--color-accent)]"
+        className="w-full min-w-0 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-[12.5px] outline-none focus:border-[var(--color-accent)]"
       />
     );
   }
@@ -96,7 +96,7 @@ export function FilterValueInput({
       value={(value as string) ?? ""}
       onChange={(e) => onChange(e.target.value || undefined)}
       placeholder="Value"
-      className="w-36 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-[12.5px] outline-none focus:border-[var(--color-accent)]"
+      className="w-full min-w-0 rounded-[var(--radius-sm)] border border-[var(--color-border)] bg-[var(--color-bg)] px-2 py-1.5 text-[12.5px] outline-none focus:border-[var(--color-accent)]"
     />
   );
 }
