@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import type { RecordDto } from "@tratable/shared";
 import type { FieldSummary } from "@/lib/hooks/use-fields";
+import { useDeleteField } from "@/lib/hooks/use-fields";
+import { useTable } from "@/lib/hooks/use-tables";
 import { useCreateRecord, useDeleteRecord, useRecords, useUpdateRecord } from "@/lib/hooks/use-records";
 import { useGridStore } from "@/lib/grid-store";
 import { CellDisplay, CellEditor } from "./cell";
@@ -93,7 +95,10 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
   const createRecord = useCreateRecord(tableId);
   const updateRecord = useUpdateRecord(tableId);
   const deleteRecord = useDeleteRecord(tableId);
+  const deleteField = useDeleteField(tableId);
+  const { data: table } = useTable(tableId);
   const { getWidth, setWidth } = useColumnWidths(tableId);
+  const [fieldError, setFieldError] = useState<string | null>(null);
 
   const { activeRowId, activeFieldId, mode, setActive, startEditing, stopEditing } = useGridStore();
 
@@ -169,10 +174,31 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
     setActive(rec.id, fields[0]?.id ?? null);
   }
 
+  async function onDeleteField(field: FieldSummary) {
+    if (field.id === table?.primary_field_id) {
+      setFieldError("The primary field can't be deleted.");
+      return;
+    }
+    if (!confirm(`Delete field "${field.name}"? This removes its data from every row.`)) return;
+    try {
+      await deleteField.mutateAsync(field.id);
+    } catch (e) {
+      setFieldError(e instanceof Error ? e.message : "Failed to delete field");
+    }
+  }
+
   const gridWidth = ROW_HEADER_WIDTH + fields.reduce((sum, f) => sum + getWidth(f.id), 0) + DEFAULT_COL_WIDTH;
 
   return (
     <div className="flex h-full flex-col">
+      {fieldError && (
+        <div className="flex items-center justify-between border-b border-red-200 bg-red-50 px-3 py-1.5 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-300">
+          {fieldError}
+          <button onClick={() => setFieldError(null)} className="px-2">
+            ✕
+          </button>
+        </div>
+      )}
       <div
         className="flex-1 overflow-auto outline-none"
         ref={containerRef}
@@ -187,10 +213,19 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
               <div
                 key={f.id}
                 style={{ width: getWidth(f.id) }}
-                className="relative shrink-0 truncate border-r border-[var(--color-border)] px-2 py-1.5 text-xs font-medium text-[var(--color-muted)]"
+                className="group/header relative flex shrink-0 items-center justify-between gap-1 border-r border-[var(--color-border)] px-2 py-1.5 text-xs font-medium text-[var(--color-muted)]"
                 title={f.name}
               >
-                {f.name}
+                <span className="truncate">{f.name}</span>
+                {f.id !== table?.primary_field_id && (
+                  <button
+                    onClick={() => onDeleteField(f)}
+                    title="Delete field"
+                    className="hidden shrink-0 text-red-500 hover:text-red-400 group-hover/header:block"
+                  >
+                    ×
+                  </button>
+                )}
                 <ColumnResizeHandle width={getWidth(f.id)} onResize={(w) => setWidth(f.id, w)} />
               </div>
             ))}
@@ -236,7 +271,20 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
                       <div
                         key={f.id}
                         style={{ width: getWidth(f.id) }}
-                        onClick={() => setActive(record.id, f.id)}
+                        onClick={() => {
+                          // Clicking inside a cell that's already the one being
+                          // edited (toggling a checkbox, picking a select option)
+                          // must NOT re-run setActive — setActive unconditionally
+                          // resets mode to "nav", which was yanking every
+                          // pointer-driven editor (checkbox, select) out of edit
+                          // mode before its click could ever reach onCommit.
+                          // Keyboard-committed editors (Enter on a text input)
+                          // never hit this because a keydown never bubbles into
+                          // this onClick, which is exactly why only those looked
+                          // like they worked.
+                          if (isEditing) return;
+                          setActive(record.id, f.id);
+                        }}
                         onDoubleClick={() => {
                           setActive(record.id, f.id);
                           startEditing();

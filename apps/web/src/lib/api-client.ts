@@ -70,8 +70,16 @@ export async function apiFetch<T>(path: string, opts: RequestOptions = {}, isRet
     throw new ApiError(res.status, body.message ?? "Request failed", body.issues);
   }
 
-  if (res.status === 204) return undefined as T;
-  return res.json();
+  // A 204 always has no body, but plenty of handlers (e.g. our DELETE
+  // routes, which return void) come back as 200 with Content-Length: 0
+  // instead — res.json() on a truly empty body throws a SyntaxError, which
+  // silently rejects the caller's promise before it ever reaches .then()/
+  // onSuccess. That's not a hypothetical: it's exactly why record deletes
+  // looked like they "needed a page refresh" — the DELETE succeeded on the
+  // server, but the frontend's promise chain broke on parsing before the
+  // query-cache invalidation that would have removed the row ever ran.
+  const text = await res.text();
+  return (text ? JSON.parse(text) : undefined) as T;
 }
 
 export const api = {
