@@ -4,7 +4,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import type { PageConfig } from "@tratable/shared";
 import { useInterface, usePublishInterface, useRegenerateToken, useRenameInterface, useUnpublishInterface } from "@/lib/hooks/use-interfaces";
-import { useCreatePage, useDeletePage, usePages, useUpdatePage, type PageSummary } from "@/lib/hooks/use-pages";
+import { useCreatePage, useDashboardPreview, useDeletePage, usePages, useUpdatePage, type PageSummary } from "@/lib/hooks/use-pages";
 import { useTables } from "@/lib/hooks/use-tables";
 import { useFields } from "@/lib/hooks/use-fields";
 import { useRecords } from "@/lib/hooks/use-records";
@@ -215,7 +215,7 @@ function PageEditor({ interfaceId, baseId, page }: { interfaceId: string; baseId
         </button>
       </div>
       <div className="min-w-0 flex-1 overflow-auto bg-[var(--color-bg)]">
-        <PagePreview config={config} />
+        <PagePreview pageId={page.id} config={config} />
       </div>
     </div>
   );
@@ -224,11 +224,20 @@ function PageEditor({ interfaceId, baseId, page }: { interfaceId: string; baseId
 /** Authenticated preview — reuses the exact same renderer components the
  * public route mounts, fed from the normal (logged-in) API instead of the
  * public one, since a page can be edited long before it's ever published. */
-function PagePreview({ config }: { config: PageConfig }) {
+function PagePreview({ pageId, config }: { pageId: string; config: PageConfig }) {
   const tableId = "tableId" in config ? config.tableId : config.widgets[0]?.tableId;
   const { data: fields } = useFields(tableId);
   const recordsQuery = useRecords(tableId);
   const records = recordsQuery.data?.pages[0]?.records ?? [];
+  const dashboardWidgets = config.type === "dashboard" ? config.widgets : [];
+  const { data: dashboardData } = useDashboardPreview(pageId, dashboardWidgets);
+
+  if (config.type === "dashboard") {
+    if (dashboardWidgets.length === 0) {
+      return <div className="p-6 text-[13px] text-[var(--color-fg-subtle)]">Add a widget to preview this dashboard.</div>;
+    }
+    return <DashboardPageRenderer widgets={dashboardData?.widgets ?? []} />;
+  }
 
   if (!tableId) {
     return <div className="p-6 text-[13px] text-[var(--color-fg-subtle)]">Choose a table to preview this page.</div>;
@@ -252,17 +261,6 @@ function PagePreview({ config }: { config: PageConfig }) {
             alert("This is a preview — form submissions only work on the published link.");
           }}
         />
-      );
-    case "dashboard":
-      // Dashboard aggregation runs server-side against the public route only
-      // (see PublicService.getDashboard) — there's no authenticated
-      // equivalent endpoint yet, so the builder can't preview real numbers
-      // before publishing.
-      return (
-        <div className="p-6 text-[13px] text-[var(--color-fg-subtle)]">
-          Dashboard widgets are computed after publishing — save your changes, publish, then open the public link to
-          see real numbers.
-        </div>
       );
   }
 }

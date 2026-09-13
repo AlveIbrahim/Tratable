@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { PageConfig } from "@tratable/shared";
+import type { DashboardWidget, PageConfig } from "@tratable/shared";
 import { api } from "../api-client";
+import type { PublicDashboard } from "./use-public";
 
 export interface PageSummary {
   id: string;
@@ -43,5 +44,18 @@ export function useDeletePage(interfaceId: string) {
   return useMutation({
     mutationFn: (id: string) => api.delete(`/pages/${id}`),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["pages", interfaceId] }),
+  });
+}
+
+/** Computes real widget numbers for the *currently edited* (possibly
+ * unsaved) dashboard config, so the builder's preview shows the same thing
+ * a viewer would see on the public page — without requiring a save/publish
+ * round trip first. Keyed on the widget list itself so it recomputes as
+ * soon as a widget changes, same as every other page type's live preview. */
+export function useDashboardPreview(pageId: string | undefined, widgets: DashboardWidget[]) {
+  return useQuery({
+    queryKey: ["pages", pageId, "dashboard-preview", widgets],
+    queryFn: () => api.post<PublicDashboard>(`/pages/${pageId}/dashboard-preview`, { widgets }),
+    enabled: !!pageId && widgets.length > 0,
   });
 }

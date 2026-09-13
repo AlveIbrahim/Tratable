@@ -49,6 +49,11 @@ export const dashboardWidgetSchema = z.object({
 });
 export type DashboardWidget = z.infer<typeof dashboardWidgetSchema>;
 
+export const previewDashboardSchema = z.object({
+  widgets: z.array(dashboardWidgetSchema),
+});
+export type PreviewDashboardDto = z.infer<typeof previewDashboardSchema>;
+
 export const dashboardPageConfigSchema = z.object({
   ...basePageFields,
   type: z.literal("dashboard"),

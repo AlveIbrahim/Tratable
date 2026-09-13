@@ -1,6 +1,6 @@
 import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { ApiBearerAuth, ApiBody, ApiOperation, ApiParam, ApiQuery, ApiTags } from "@nestjs/swagger";
-import { createPageSchema, updatePageSchema } from "@tratable/shared";
+import { createPageSchema, DashboardWidget, previewDashboardSchema, updatePageSchema } from "@tratable/shared";
 import { RequireRole } from "../common/decorators/require-role.decorator";
 import { ResourceParam } from "../common/decorators/resource-param.decorator";
 import { ZodValidationPipe } from "../common/pipes/zod-validation.pipe";
@@ -69,5 +69,20 @@ export class PagesController {
   @ApiParam({ name: "pageId" })
   remove(@Param("pageId") pageId: string) {
     return this.pages.remove(pageId);
+  }
+
+  @Post(":pageId/dashboard-preview")
+  @RequireRole("viewer")
+  @ResourceParam("page", "pageId")
+  @ApiOperation({
+    summary: "Compute dashboard widget values for the builder's live preview",
+    description:
+      "Takes the widget list currently being edited (not necessarily saved yet) and returns the same shape " +
+      "the public route's dashboard endpoint does, so a widget looks identical before and after publishing.",
+  })
+  @ApiParam({ name: "pageId" })
+  @ApiBody({ schema: { type: "object", required: ["widgets"], properties: { widgets: { type: "array", items: { type: "object" } } } } })
+  previewDashboard(@Param("pageId") pageId: string, @Body(new ZodValidationPipe(previewDashboardSchema)) dto: { widgets: DashboardWidget[] }) {
+    return this.pages.previewDashboard(pageId, dto.widgets);
   }
 }

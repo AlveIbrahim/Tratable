@@ -1,6 +1,7 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
-import { CreatePageDto, makeId, UpdatePageDto } from "@tratable/shared";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
+import { CreatePageDto, DashboardWidget, makeId, UpdatePageDto } from "@tratable/shared";
 import { DatabaseService } from "../database/database.service";
+import { DashboardService } from "../query/dashboard.service";
 
 const POS_STEP = 65536;
 
@@ -16,7 +17,10 @@ function slugify(name: string): string {
 
 @Injectable()
 export class PagesService {
-  constructor(private readonly db: DatabaseService) {}
+  constructor(
+    private readonly db: DatabaseService,
+    private readonly dashboard: DashboardService,
+  ) {}
 
   async create(dto: CreatePageDto) {
     const id = makeId("page");
@@ -87,5 +91,43 @@ export class PagesService {
   async remove(id: string) {
     await this.getOrThrow(id);
     await this.db.db.deleteFrom("interface_pages").where("id", "=", id).execute();
+  }
+
+  /** Lets the builder show real numbers in a dashboard's preview *before*
+   * publishing/saving — computed against whatever widget list the editor
+   * currently has in memory, not what's persisted. `@RequireRole("viewer")`
+   * + `@ResourceParam("page", ...)` on the controller already proves the
+   * caller can see this page; the check here additionally proves every
+   * table a widget references belongs to the *same base* as this page, so a
+   * crafted request can't probe aggregate data on a table in a base the
+   * caller was never granted access to just by naming its id in a widget. */
+  async previewDashboard(pageId: string, widgets: DashboardWidget[]) {
+    const page = await this.getOrThrow(pageId);
+    const iface = await this.db.db
+      .selectFrom("interfaces")
+      .select("base_id")
+      .where("id", "=", page.interface_id)
+      .executeTakeFirstOrThrow();
+
+    const tableIds = [...new Set(widgets.map((w) => w.tableId))];
+    if (tableIds.length > 0) {
+      const owned = await this.db.db
+        .selectFrom("tables")
+        .select("id")
+        .where("id", "in", tableIds)
+        .where("base_id", "=", iface.base_id)
+        .execute();
+      const ownedIds = new Set(owned.map((t) => t.id));
+      const foreign = tableIds.filter((id) => !ownedIds.has(id));
+      if (foreign.length > 0) {
+        throw new BadRequestException(`Table(s) not in this interface's base: ${foreign.join(", ")}`);
+      }
+    }
+
+    const results: Awaited<ReturnType<DashboardService["computeWidget"]>>[] = [];
+    for (const widget of widgets) {
+      results.push(await this.dashboard.computeWidget(widget));
+    }
+    return { widgets: results };
   }
 }
