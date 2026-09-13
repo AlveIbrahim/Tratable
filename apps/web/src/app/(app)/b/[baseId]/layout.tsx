@@ -9,7 +9,7 @@ import { useCreateTable, useDeleteTable, useTables } from "@/lib/hooks/use-table
 import { ImportWizard } from "@/components/import/import-wizard";
 import { downloadFile } from "@/lib/api-client";
 import { chipColorClass } from "@/lib/colors";
-import { DatabaseIcon, DownloadIcon, PlusIcon, TableIcon, UploadIcon, XIcon } from "@/components/ui/icons";
+import { DatabaseIcon, DownloadIcon, FolderIcon, PlusIcon, TableIcon, UploadIcon, XIcon } from "@/components/ui/icons";
 
 export default function BaseLayout({
   children,
@@ -122,6 +122,22 @@ export default function BaseLayout({
           <PlusIcon width={13} height={13} />
           Table
         </button>
+
+        <div className="mx-1 h-4 w-px shrink-0 self-center bg-[var(--color-border)]" />
+        <div
+          className={clsx(
+            "group/tab relative flex shrink-0 items-center gap-1.5 px-3 py-2.5 text-[13px] transition-colors",
+            pathname.includes(`/b/${baseId}/i`) ? "text-[var(--color-fg)]" : "text-[var(--color-fg-muted)] hover:text-[var(--color-fg)]",
+          )}
+        >
+          <FolderIcon width={13} height={13} className="shrink-0 opacity-70" />
+          <Link href={`/b/${baseId}/i`} className="font-medium">
+            Interfaces
+          </Link>
+          {pathname.includes(`/b/${baseId}/i`) && (
+            <div className="absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-[var(--color-accent)]" />
+          )}
+        </div>
       </div>
 
       <div className="min-h-0 flex-1">{children}</div>

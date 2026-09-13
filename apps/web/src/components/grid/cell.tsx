@@ -16,8 +16,19 @@ interface SelectChoice {
  * dispatched the same way the shared field registry's formatToCsv does
  * (kept as a parallel switch here rather than importing formatToCsv
  * directly, since the display format for a grid cell and a CSV cell
- * differ slightly — e.g. checkboxes render as a box, not "true"/"false"). */
-export function CellDisplay({ field, value }: { field: FieldSummary; value: unknown }) {
+ * differ slightly — e.g. checkboxes render as a box, not "true"/"false").
+ *
+ * Takes only the id/type/options every field summary carries — not the
+ * full FieldSummary — so it also accepts a RendererField (the narrower
+ * shape the public API and interface renderers use, which has no
+ * table_id/pos). Same component, both call sites. */
+export function CellDisplay({
+  field,
+  value,
+}: {
+  field: Pick<FieldSummary, "id" | "type" | "options">;
+  value: unknown;
+}) {
   if (value === null || value === undefined || value === "") {
     return null;
   }

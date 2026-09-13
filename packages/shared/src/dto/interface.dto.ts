@@ -14,6 +14,7 @@ export const gridPageConfigSchema = z.object({
   allowCreate: z.boolean().default(false),
   allowDelete: z.boolean().default(false),
 });
+export type GridPageConfig = z.infer<typeof gridPageConfigSchema>;
 
 export const recordDetailPageConfigSchema = z.object({
   ...basePageFields,
@@ -22,6 +23,7 @@ export const recordDetailPageConfigSchema = z.object({
   recordSelector: z.enum(["url_param", "picker"]),
   sections: z.array(z.object({ title: z.string(), fieldIds: z.array(z.string()) })),
 });
+export type RecordDetailPageConfig = z.infer<typeof recordDetailPageConfigSchema>;
 
 export const listPageConfigSchema = z.object({
   ...basePageFields,
@@ -33,6 +35,7 @@ export const listPageConfigSchema = z.object({
   imageFieldId: z.string().optional(),
   filters: filterNodeSchema.optional(),
 });
+export type ListPageConfig = z.infer<typeof listPageConfigSchema>;
 
 export const dashboardWidgetSchema = z.object({
   type: z.enum(["number", "bar", "line", "pie"]),
@@ -51,6 +54,7 @@ export const dashboardPageConfigSchema = z.object({
   type: z.literal("dashboard"),
   widgets: z.array(dashboardWidgetSchema),
 });
+export type DashboardPageConfig = z.infer<typeof dashboardPageConfigSchema>;
 
 export const formPageConfigSchema = z.object({
   ...basePageFields,
@@ -68,6 +72,7 @@ export const formPageConfigSchema = z.object({
   successMessage: z.string().default("Thanks! Your response was recorded."),
   redirectUrl: z.string().url().optional(),
 });
+export type FormPageConfig = z.infer<typeof formPageConfigSchema>;
 
 export const pageConfigSchema = z.discriminatedUnion("type", [
   gridPageConfigSchema,
