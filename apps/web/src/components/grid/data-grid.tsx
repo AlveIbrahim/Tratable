@@ -2,21 +2,30 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import type { RecordDto } from "@tratable/shared";
+import type { RecordDto, SortSpec } from "@tratable/shared";
 import type { FieldSummary } from "@/lib/hooks/use-fields";
 import { useDeleteField } from "@/lib/hooks/use-fields";
 import { downloadFile } from "@/lib/api-client";
 import { useTable } from "@/lib/hooks/use-tables";
+import { useActiveView } from "@/lib/hooks/use-views";
 import { useCreateRecord, useDeleteRecord, useRecords, useUpdateRecord } from "@/lib/hooks/use-records";
 import { useGridStore } from "@/lib/grid-store";
+import { chipColorClass } from "@/lib/colors";
 import { CellDisplay, CellEditor } from "./cell";
 import { AddFieldButton } from "./add-field-button";
+import { ViewToolbar } from "./view-toolbar";
 import { DownloadIcon, FieldTypeIcon, PlusIcon, TrashIcon, XIcon } from "@/components/ui/icons";
 
 const ROW_HEIGHT = 34;
+const GROUP_HEADER_HEIGHT = 32;
 const DEFAULT_COL_WIDTH = 180;
 const MIN_COL_WIDTH = 80;
 const ROW_HEADER_WIDTH = 46;
+
+interface Choice {
+  id: string;
+  name: string;
+}
 
 /** Per-field column widths, resizable by dragging the header's right edge
  * (like Airtable/Excel). Persisted to localStorage per table so a reload
@@ -90,8 +99,92 @@ function ColumnResizeHandle({ width, onResize }: { width: number; onResize: (wid
   );
 }
 
+/** Renders a group-by value the same way the field's own chips render it
+ * elsewhere (choice name via chip, not a raw id), so "Group by Status"
+ * reads the header as "Pro" / "Basic", never an opaque opt_xxxxx string. */
+function groupLabel(field: FieldSummary, value: unknown): string {
+  if (value === null || value === undefined || value === "") return "Empty";
+  if (field.type === "checkbox") return value ? "Checked" : "Unchecked";
+  if (field.type === "singleSelect") {
+    const choices = (field.options.choices as Choice[]) ?? [];
+    return choices.find((c) => c.id === value)?.name ?? String(value);
+  }
+  if (field.type === "multiSelect" && Array.isArray(value)) {
+    const choices = (field.options.choices as Choice[]) ?? [];
+    return value.map((id) => choices.find((c) => c.id === id)?.name ?? id).join(", ") || "Empty";
+  }
+  return String(value);
+}
+
+/** Grouping is implemented purely client-side over the already-sorted flat
+ * record list — never a server-side concept. It only produces correct,
+ * contiguous buckets because the caller guarantees the group field is
+ * always sort column zero (see effectiveSorts below); this function just
+ * walks the list once looking for where that column's value changes. */
+type FlatItem =
+  | { type: "group"; key: string; label: string; count: number; colorKey: string }
+  | { type: "record"; record: RecordDto };
+
+function buildFlatItems(records: RecordDto[], groupField: FieldSummary | undefined): FlatItem[] {
+  if (!groupField) return records.map((record) => ({ type: "record", record }));
+
+  const items: FlatItem[] = [];
+  let currentKey: string | null = null;
+  let groupStartIdx = -1;
+
+  const finalizeGroup = () => {
+    if (groupStartIdx === -1) return;
+    let count = 0;
+    for (let i = groupStartIdx; i < items.length; i++) if (items[i].type === "record") count++;
+    (items[groupStartIdx] as Extract<FlatItem, { type: "group" }>).count = count;
+  };
+
+  for (const record of records) {
+    const value = record.data[groupField.id];
+    const key = JSON.stringify(value ?? null);
+    if (key !== currentKey) {
+      finalizeGroup();
+      currentKey = key;
+      groupStartIdx = items.length;
+      // Color the group header chip by the SAME identity a cell's own chip
+      // uses (the raw choice id, for select types) — not the JSON-stringified
+      // bucket key, which would hash to a different, mismatched color.
+      let colorKey = key;
+      if (groupField.type === "singleSelect" && typeof value === "string") {
+        colorKey = value;
+      } else if (groupField.type === "multiSelect" && Array.isArray(value) && typeof value[0] === "string") {
+        colorKey = value[0];
+      }
+      items.push({ type: "group", key, label: groupLabel(groupField, value), count: 0, colorKey });
+    }
+    items.push({ type: "record", record });
+  }
+  finalizeGroup();
+  return items;
+}
+
 export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSummary[] }) {
-  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useRecords(tableId);
+  const { data: view } = useActiveView(tableId);
+  const config = view?.config;
+
+  // Grouping is a sort under the hood — the group field must be sort column
+  // zero for same-group rows to land contiguously, so it's prepended unless
+  // already there. This is the only place "group" logic touches the query;
+  // the API has no idea grouping exists, it only ever sees an ordinary
+  // multi-column sort (see records.service.ts's list()).
+  const effectiveSorts: SortSpec[] | undefined = useMemo(() => {
+    if (!config) return undefined;
+    const sorts = config.sorts ?? [];
+    if (!config.groupByFieldId) return sorts;
+    if (sorts[0]?.fieldId === config.groupByFieldId) return sorts;
+    return [{ fieldId: config.groupByFieldId, direction: "asc" as const }, ...sorts];
+  }, [config]);
+
+  const { data, fetchNextPage, hasNextPage, isFetchingNextPage } = useRecords(
+    tableId,
+    config?.filters,
+    effectiveSorts,
+  );
   const records: RecordDto[] = useMemo(() => data?.pages.flatMap((p) => p.records) ?? [], [data]);
 
   const createRecord = useCreateRecord(tableId);
@@ -104,15 +197,43 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
 
   const { activeRowId, activeFieldId, mode, setActive, startEditing, stopEditing } = useGridStore();
 
+  const groupField = config?.groupByFieldId ? fields.find((f) => f.id === config.groupByFieldId) : undefined;
+  const colorField = config?.colorFieldId ? fields.find((f) => f.id === config.colorFieldId) : undefined;
+
+  const flatItems = useMemo(() => buildFlatItems(records, groupField), [records, groupField]);
+  const flatIndexByRecordId = useMemo(() => {
+    const map = new Map<string, number>();
+    flatItems.forEach((item, idx) => {
+      if (item.type === "record") map.set(item.record.id, idx);
+    });
+    return map;
+  }, [flatItems]);
+
+  /** Row background tint for "Color by field" — reuses the exact same
+   * id-hashed chip palette as every chip elsewhere, so a colored row always
+   * matches the color of its own chip. Multi-select colors by its first
+   * choice; there's no single color for an arbitrary combination. */
+  function rowTint(record: RecordDto): string | undefined {
+    if (!colorField) return undefined;
+    const value = record.data[colorField.id];
+    const choiceId =
+      colorField.type === "singleSelect" ? (value as string | undefined)
+      : colorField.type === "multiSelect" && Array.isArray(value) ? (value[0] as string | undefined)
+      : undefined;
+    if (!choiceId) return undefined;
+    const n = chipColorClass(choiceId).replace("chip-", "");
+    return `var(--chip-${n}-bg)`;
+  }
+
   const containerRef = useRef<HTMLDivElement>(null);
   const rowVirtualizer = useVirtualizer({
-    count: records.length,
+    count: flatItems.length,
     getScrollElement: () => containerRef.current,
-    estimateSize: () => ROW_HEIGHT,
+    estimateSize: (index) => (flatItems[index]?.type === "group" ? GROUP_HEADER_HEIGHT : ROW_HEIGHT),
     overscan: 12,
     onChange: (instance) => {
       const lastItem = instance.getVirtualItems().at(-1);
-      if (lastItem && lastItem.index >= records.length - 5 && hasNextPage && !isFetchingNextPage) {
+      if (lastItem && lastItem.index >= flatItems.length - 5 && hasNextPage && !isFetchingNextPage) {
         fetchNextPage();
       }
     },
@@ -128,7 +249,8 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
     const nextRow = records[Math.min(Math.max(rowIdx + rowDelta, 0), records.length - 1)];
     const nextField = fields[Math.min(Math.max(colIdx + colDelta, 0), fields.length - 1)];
     setActive(nextRow.id, nextField.id);
-    rowVirtualizer.scrollToIndex(Math.min(Math.max(rowIdx + rowDelta, 0), records.length - 1));
+    const flatIdx = flatIndexByRecordId.get(nextRow.id);
+    if (flatIdx !== undefined) rowVirtualizer.scrollToIndex(flatIdx);
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -193,6 +315,7 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
 
   return (
     <div className="flex h-full flex-col bg-[var(--color-bg)]">
+      {view && <ViewToolbar tableId={tableId} view={view} fields={fields} />}
       {fieldError && (
         <div className="flex items-center justify-between border-b border-[var(--color-danger)]/20 bg-[var(--color-danger-soft)] px-3 py-1.5 text-[13px] text-[var(--color-danger)]">
           {fieldError}
@@ -240,7 +363,39 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
           {/* Virtualized body */}
           <div style={{ height: rowVirtualizer.getTotalSize(), position: "relative" }}>
             {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-              const record = records[virtualRow.index];
+              const item = flatItems[virtualRow.index];
+              if (!item) return null;
+
+              if (item.type === "group") {
+                return (
+                  <div
+                    key={`group-${item.key}-${virtualRow.index}`}
+                    style={{
+                      position: "absolute",
+                      top: 0,
+                      left: 0,
+                      width: "100%",
+                      height: GROUP_HEADER_HEIGHT,
+                      transform: `translateY(${virtualRow.start}px)`,
+                    }}
+                    className="flex items-center gap-2 border-b border-[var(--color-border)] bg-[var(--color-surface)] px-3 text-[12px] font-medium"
+                  >
+                    <span
+                      className="rounded-full px-2 py-0.5 text-[11.5px] font-medium"
+                      style={{
+                        background: `var(--chip-${chipColorClass(item.colorKey).replace("chip-", "")}-bg)`,
+                        color: `var(--chip-${chipColorClass(item.colorKey).replace("chip-", "")}-fg)`,
+                      }}
+                    >
+                      {item.label}
+                    </span>
+                    <span className="text-[var(--color-fg-subtle)]">{item.count}</span>
+                  </div>
+                );
+              }
+
+              const record = item.record;
+              const tint = rowTint(record);
               return (
                 <div
                   key={record.id}
@@ -251,14 +406,17 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
                     width: "100%",
                     height: ROW_HEIGHT,
                     transform: `translateY(${virtualRow.start}px)`,
+                    backgroundColor: tint,
                   }}
-                  className="group/row flex border-b border-[var(--color-border)] hover:bg-[var(--color-surface-hover)]"
+                  className={`group/row flex border-b border-[var(--color-border)] ${
+                    tint ? "hover:brightness-95 dark:hover:brightness-125" : "hover:bg-[var(--color-surface-hover)]"
+                  }`}
                 >
                   <div
                     style={{ width: ROW_HEADER_WIDTH }}
                     className="flex shrink-0 items-center justify-center border-r border-[var(--color-border)] text-[11.5px] text-[var(--color-fg-subtle)]"
                   >
-                    <span className="group-hover/row:hidden">{virtualRow.index + 1}</span>
+                    <span className="group-hover/row:hidden">{records.indexOf(record) + 1}</span>
                     <button
                       className="hidden rounded p-0.5 text-[var(--color-danger)] hover:bg-[var(--color-danger-soft)] group-hover/row:block"
                       onClick={() => deleteRecord.mutate(record.id)}

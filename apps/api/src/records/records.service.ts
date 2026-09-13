@@ -12,7 +12,7 @@ import {
 } from "@tratable/shared";
 import { DatabaseService } from "../database/database.service";
 import { decodeCursor, encodeCursor } from "../common/pagination";
-import { compileFilterTree, compileSorts, QueryCompilerError } from "../query/query-compiler";
+import { compileFilterTree, compileKeysetCondition, compileSortExpr, orderByModifier, QueryCompilerError } from "../query/query-compiler";
 import { FieldRow } from "../database/schema";
 
 const POS_STEP = 65536;
@@ -141,8 +141,15 @@ export class RecordsService {
   }
 
   /**
-   * Keyset-paginated, filtered, sorted listing. Never uses OFFSET — the
-   * cursor is (primary sort value, id), opaque base64 to the caller.
+   * Keyset-paginated, filtered, multi-sorted listing. Never uses OFFSET —
+   * the cursor carries one value per active sort column plus `id`, opaque
+   * base64 to the caller. Supports an arbitrary number of sort columns
+   * (each with its own direction) correctly across page boundaries, not
+   * just the first one — see compileKeysetCondition's doc comment for why
+   * that distinction matters (it's also what makes "group by field X"
+   * work correctly: grouping is implemented by prepending the group field
+   * as sort column zero, which only paginates correctly if every sort
+   * column after it is honored too).
    */
   async list(
     tableId: string,
@@ -161,34 +168,41 @@ export class RecordsService {
     // field list and throw QueryCompilerError on anything unknown or
     // unsupported — a client-supplied filter/sort is untrusted input, so
     // this must surface as 400 Bad Request, never a bare 500.
-    let primarySort: SortSpec;
-    let usingPos: boolean;
-    let sortExprSql;
+    let sortColumns: { expr: ReturnType<typeof compileSortExpr>; direction: "asc" | "desc"; fieldId: string }[];
     try {
       if (opts.filters) {
         const compiled = compileFilterTree(opts.filters, fields);
         query = query.where(() => compiled);
       }
-      primarySort = sorts[0];
-      usingPos = primarySort.fieldId === "__pos__";
-      sortExprSql = usingPos ? sql.raw("pos") : compileSorts([primarySort], fields)[0].expr;
+      sortColumns = sorts.map((s) => ({
+        expr: s.fieldId === "__pos__" ? sql.raw("pos") : compileSortExpr(this.fieldById(fields, s.fieldId)),
+        direction: s.direction,
+        fieldId: s.fieldId,
+      }));
     } catch (e) {
       if (e instanceof QueryCompilerError) throw new BadRequestException(e.message);
       throw e;
     }
-    const direction = primarySort.direction;
+
+    // `id` is always the final, implicit tiebreak column — ascending,
+    // independent of the other columns' directions (see
+    // compileKeysetCondition's doc comment for why that's still correct).
+    const idCol = { expr: sql.raw("id") as ReturnType<typeof compileSortExpr>, direction: "asc" as const, fieldId: "id" };
+    const allColumns = [...sortColumns, idCol];
 
     if (opts.cursor) {
       const cursor = decodeCursor(opts.cursor);
-      const cmp = direction === "asc" ? sql`>` : sql`<`;
-      // Tie-break on id so rows with equal sort values don't get skipped
-      // or repeated across pages.
-      query = query.where(
-        () => sql`(${sortExprSql}, id) ${cmp} (${cursor.sortValue}, ${cursor.id})`,
-      );
+      if (cursor.sortValues.length !== sortColumns.length) {
+        throw new BadRequestException("Cursor does not match the current sort — reload and try again");
+      }
+      const condition = compileKeysetCondition(allColumns, [...cursor.sortValues, cursor.id]);
+      query = query.where(() => condition);
     }
 
-    query = query.orderBy(sortExprSql as any, direction).orderBy("id", direction).limit(opts.limit + 1);
+    for (const col of allColumns) {
+      query = query.orderBy(col.expr as any, orderByModifier(col.direction));
+    }
+    query = query.limit(opts.limit + 1);
 
     const rows = await query.execute();
     const hasMore = rows.length > opts.limit;
@@ -197,11 +211,19 @@ export class RecordsService {
     let nextCursor: string | null = null;
     if (hasMore) {
       const last = page[page.length - 1];
-      const sortValue = usingPos ? last.pos : (last.data as Record<string, unknown>)[primarySort.fieldId] ?? null;
-      nextCursor = encodeCursor({ sortValue, id: last.id });
+      const sortValues = sortColumns.map((col) =>
+        col.fieldId === "__pos__" ? last.pos : ((last.data as Record<string, unknown>)[col.fieldId] ?? null),
+      );
+      nextCursor = encodeCursor({ sortValues, id: last.id });
     }
 
     return { records: page, nextCursor };
+  }
+
+  private fieldById(fields: FieldRow[], fieldId: string): FieldRow {
+    const field = fields.find((f) => f.id === fieldId);
+    if (!field) throw new QueryCompilerError(`Unknown field "${fieldId}" for this table`);
+    return field;
   }
 
   /** Move a record to sit between two neighbors (either may be omitted for

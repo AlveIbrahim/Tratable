@@ -155,3 +155,68 @@ export function compileSortExpr(sortField: FieldRow): RawBuilder<unknown> {
 export function compileSorts(sorts: SortSpec[], fields: FieldRow[]): { expr: RawBuilder<unknown>; direction: "asc" | "desc" }[] {
   return sorts.map((s) => ({ expr: compileSortExpr(fieldById(fields, s.fieldId)), direction: s.direction }));
 }
+
+/**
+ * Builds the WHERE predicate for keyset pagination across N sort columns
+ * with independent per-column direction (e.g. sort by Status asc, then
+ * Created desc) plus a final `id` tiebreaker. This replaces a previous
+ * implementation that only ever paginated correctly on the FIRST sort
+ * column — any additional sort keys were silently ignored past page one,
+ * which is exactly the kind of bug that "looks fine on page 1" and then
+ * quietly reorders or duplicates rows once a user scrolls, or once
+ * grouping (which needs a real secondary sort to keep group members
+ * contiguous) is layered on top.
+ *
+ * Standard lexicographic keyset comparison, built right-to-left:
+ *   last column:   col_n OP_n val_n
+ *   column i<n:    (col_i OP_i val_i) OR (col_i = val_i AND <rest>)
+ * where OP is `>` for ascending, `<` for descending. `id` is always the
+ * final, implicit tiebreaker column (ascending) — its direction doesn't
+ * need to match the other columns for the algorithm to be correct, only
+ * to stay consistent between this predicate and the ORDER BY clause.
+ */
+export function compileKeysetCondition(
+  columns: { expr: RawBuilder<unknown>; direction: "asc" | "desc" }[],
+  cursorValues: unknown[],
+): RawBuilder<boolean> {
+  // Sort columns backing arbitrary fields are frequently nullable — a
+  // number or date field with blank cells, most obviously — and a naive
+  // `col < NULL` / `col > NULL` is never true in SQL (NULL comparisons are
+  // NULL, not false), so the very first cursor row with a NULL sort value
+  // silently truncated every page after it. Caught by testing this fix
+  // against real data with blank cells, not found in review.
+  //
+  // Fixed by adopting one explicit rule — NULLs sort last regardless of
+  // direction (also matches ORDER BY ... NULLS LAST applied alongside this,
+  // and reads as sensible product behavior: empty values sink to the
+  // bottom either way) — and building both branches accordingly:
+  //   cursor value is NOT NULL: "after" = (non-null AND col > v) OR NULL;
+  //                             "tied"  = col = v
+  //   cursor value IS NULL:     "after" = FALSE (nothing sorts past NULLS LAST);
+  //                             "tied"  = col IS NULL
+  // `id` (always the final column) is never null, so this degrades to the
+  // original simple `id > cursorId` for it — no special case needed.
+  function build(i: number): RawBuilder<boolean> {
+    const { expr, direction } = columns[i];
+    const value = cursorValues[i];
+    const gt = direction === "asc" ? sql`>` : sql`<`;
+
+    const after: RawBuilder<boolean> =
+      value === null || value === undefined
+        ? sql`FALSE`
+        : sql`((${expr} IS NOT NULL AND ${expr} ${gt} ${value}) OR ${expr} IS NULL)`;
+
+    if (i === columns.length - 1) return after;
+
+    const tied: RawBuilder<boolean> = value === null || value === undefined ? sql`${expr} IS NULL` : sql`${expr} = ${value}`;
+    return sql`(${after} OR (${tied} AND ${build(i + 1)}))`;
+  }
+  return build(0);
+}
+
+/** The direction+NULLS-ordering modifier for an ORDER BY column, matching
+ * compileKeysetCondition's "NULLs always sort last" rule exactly — the two
+ * must agree, or pagination and display order silently diverge. */
+export function orderByModifier(direction: "asc" | "desc"): RawBuilder<unknown> {
+  return sql.raw(`${direction} nulls last`);
+}

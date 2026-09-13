@@ -98,6 +98,20 @@ export const ListPlusIcon = (p: IconProps) => (
     <path d="M4 7h11M4 12h7M4 17h7M18 15v6M15 18h6" />
   </svg>
 );
+export const SortIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M7 4v16M4 7l3-3 3 3M17 20V4M14 17l3 3 3-3" />
+  </svg>
+);
+export const PaletteIcon = (p: IconProps) => (
+  <svg {...base(p)}>
+    <path d="M12 3a9 8 0 1 0 0 16c1.1 0 1.7-.9 1.2-1.8-.3-.6.1-1.2.8-1.2H15a4 4 0 0 0 4-4c0-5-3-9-7-9Z" />
+    <circle cx="7.5" cy="11" r="1" fill="currentColor" stroke="none" />
+    <circle cx="9.5" cy="7" r="1" fill="currentColor" stroke="none" />
+    <circle cx="14.5" cy="7" r="1" fill="currentColor" stroke="none" />
+    <circle cx="16.5" cy="11" r="1" fill="currentColor" stroke="none" />
+  </svg>
+);
 
 const FIELD_ICONS: Record<FieldType, (p: IconProps) => React.JSX.Element> = {
   singleLineText: TextIcon,

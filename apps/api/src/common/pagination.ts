@@ -1,7 +1,10 @@
 /** Opaque keyset-pagination cursor. Never use OFFSET for records — this repo's
- * scale target is 100k rows/table and OFFSET degrades linearly with depth. */
+ * scale target is 100k rows/table and OFFSET degrades linearly with depth.
+ * sortValues holds one entry per active sort column, in order, so multi-
+ * column sorts (and grouping, which is implemented as a sort by the group
+ * field) paginate correctly past page one — not just the first column. */
 export interface Cursor {
-  sortValue: unknown;
+  sortValues: unknown[];
   id: string;
 }
 

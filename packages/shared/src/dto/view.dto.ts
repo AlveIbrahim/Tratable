@@ -8,6 +8,12 @@ export const viewConfigSchema = z.object({
   sorts: z.array(sortSpecSchema).default([]),
   rowHeight: z.enum(["short", "medium", "tall"]).default("short"),
   groupByFieldId: z.string().optional(),
+  /** Tints each row's background by this field's chosen value — restricted
+   * client-side to singleSelect/multiSelect (see view-toolbar.tsx), since
+   * "color by value" only makes sense for a field with a bounded set of
+   * choices. Reuses the same id-hashed chip color as everywhere else in
+   * the UI, so a row's tint always matches its own chip's color. */
+  colorFieldId: z.string().optional(),
 });
 export type ViewConfig = z.infer<typeof viewConfigSchema>;
 

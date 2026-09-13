@@ -6,7 +6,7 @@ import { sql } from "kysely";
 import { FilterNode, getFieldType, SortSpec } from "@tratable/shared";
 import { DatabaseService } from "../database/database.service";
 import { FieldRow, RecordRow } from "../database/schema";
-import { compileFilterTree, compileSorts, QueryCompilerError } from "../query/query-compiler";
+import { compileFilterTree, compileKeysetCondition, compileSortExpr, orderByModifier, QueryCompilerError } from "../query/query-compiler";
 
 const BATCH_SIZE = 2000;
 
@@ -19,6 +19,12 @@ interface ResolvedView {
 @Injectable()
 export class ExportService {
   constructor(private readonly db: DatabaseService) {}
+
+  private fieldById(fields: FieldRow[], fieldId: string): FieldRow {
+    const field = fields.find((f) => f.id === fieldId);
+    if (!field) throw new QueryCompilerError(`Unknown field "${fieldId}" for this table`);
+    return field;
+  }
 
   private async getTableOrThrow(tableId: string) {
     const table = await this.db.db
@@ -106,10 +112,19 @@ export class ExportService {
     // and far simpler than resolving per-batch.
     const linkLabelResolvers = await this.buildLinkLabelResolvers(resolved.fields);
 
-    let cursor: { sortValue: unknown; id: string } | undefined;
+    let cursor: { sortValues: unknown[]; id: string } | undefined;
     const sorts: SortSpec[] = resolved.sorts.length ? resolved.sorts : [{ fieldId: "__pos__", direction: "asc" }];
-    const primarySort = sorts[0];
-    const usingPos = primarySort.fieldId === "__pos__";
+    // Same multi-column keyset approach as records.service.ts's list() —
+    // an export must sort identically to the grid it's exporting "what
+    // you're looking at" from, and a single-column-only cursor would
+    // silently diverge the moment a view has more than one sort level.
+    const sortColumns = sorts.map((s) => ({
+      expr: s.fieldId === "__pos__" ? sql.raw("pos") : compileSortExpr(this.fieldById(resolved.fields, s.fieldId)),
+      direction: s.direction,
+      fieldId: s.fieldId,
+    }));
+    const idCol = { expr: sql.raw("id") as (typeof sortColumns)[number]["expr"], direction: "asc" as const, fieldId: "id" };
+    const allColumns = [...sortColumns, idCol];
 
     // eslint-disable-next-line no-constant-condition
     while (true) {
@@ -124,20 +139,16 @@ export class ExportService {
         query = query.where(() => compiled);
       }
 
-      const sortExprSql = usingPos
-        ? sql.raw("pos")
-        : compileSorts([primarySort], resolved.fields)[0].expr;
-
       if (cursor) {
-        const cmp = primarySort.direction === "asc" ? sql`>` : sql`<`;
-        query = query.where(() => sql`(${sortExprSql}, id) ${cmp} (${cursor!.sortValue}, ${cursor!.id})`);
+        const condition = compileKeysetCondition(allColumns, [...cursor.sortValues, cursor.id]);
+        query = query.where(() => condition);
       }
 
-      const rows = await query
-        .orderBy(sortExprSql as any, primarySort.direction)
-        .orderBy("id", primarySort.direction)
-        .limit(BATCH_SIZE)
-        .execute();
+      for (const col of allColumns) {
+        query = query.orderBy(col.expr as any, orderByModifier(col.direction));
+      }
+
+      const rows = await query.limit(BATCH_SIZE).execute();
 
       if (rows.length === 0) break;
 
@@ -159,10 +170,10 @@ export class ExportService {
       }
 
       const last = rows[rows.length - 1];
-      cursor = {
-        sortValue: usingPos ? last.pos : (last.data as Record<string, unknown>)[primarySort.fieldId] ?? null,
-        id: last.id,
-      };
+      const sortValues = sortColumns.map((col) =>
+        col.fieldId === "__pos__" ? last.pos : ((last.data as Record<string, unknown>)[col.fieldId] ?? null),
+      );
+      cursor = { sortValues, id: last.id };
 
       if (rows.length < BATCH_SIZE) break;
     }
