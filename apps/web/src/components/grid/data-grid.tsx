@@ -289,13 +289,14 @@ export function DataGrid({ tableId, fields }: { tableId: string; fields: FieldSu
                           setActive(record.id, f.id);
                           startEditing();
                         }}
-                        className={`shrink-0 truncate border-r border-[var(--color-border)] px-2 py-1 text-sm ${
+                        className={`relative shrink-0 truncate border-r border-[var(--color-border)] px-2 py-1 text-sm ${
                           isActive ? "ring-1 ring-inset ring-[var(--color-accent)]" : ""
                         }`}
                       >
                         {isEditing ? (
                           <CellEditor
                             field={f}
+                            tableId={tableId}
                             value={record.data[f.id]}
                             onCommit={(v) => commitCell(record.id, f.id, v)}
                             onCancel={stopEditing}

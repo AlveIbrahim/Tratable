@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import type { FieldSummary } from "@/lib/hooks/use-fields";
-import { Select } from "@/components/ui/select";
+import { SelectCellEditor } from "./select-cell-editor";
 
 interface SelectChoice {
   id: string;
@@ -63,11 +63,13 @@ export function CellDisplay({ field, value }: { field: FieldSummary; value: unkn
  * present an input. */
 export function CellEditor({
   field,
+  tableId,
   value,
   onCommit,
   onCancel,
 }: {
   field: FieldSummary;
+  tableId: string;
   value: unknown;
   onCommit: (value: unknown) => void;
   onCancel: () => void;
@@ -99,16 +101,15 @@ export function CellEditor({
     );
   }
 
-  if (field.type === "singleSelect") {
-    const choices = (field.options.choices as SelectChoice[]) ?? [];
+  if (field.type === "singleSelect" || field.type === "multiSelect") {
     return (
-      <Select
-        autoOpen
-        value={(value as string) ?? ""}
-        onChange={(v) => onCommit(v || null)}
-        onClose={onCancel}
-        placeholder=""
-        options={choices.map((c) => ({ value: c.id, label: c.name }))}
+      <SelectCellEditor
+        field={field}
+        tableId={tableId}
+        value={value as string | string[] | null}
+        multi={field.type === "multiSelect"}
+        onCommit={onCommit}
+        onCancel={onCancel}
       />
     );
   }
