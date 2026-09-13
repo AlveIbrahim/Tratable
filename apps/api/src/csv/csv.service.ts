@@ -147,7 +147,11 @@ export class CsvService {
 
   async getStatus(jobId: string): Promise<ImportJobStatus> {
     const job = await this.getJobOrThrow(jobId);
-    const stats = job.stats as ImportJobStatus["stats"] | null;
+    const rawStats = job.stats as ImportJobStatus["stats"] | null;
+    // A job that threw before row processing (a name collision, a bad
+    // mapping) has an {error} stats shape, not row counts — only compute
+    // progress from the latter.
+    const stats = rawStats && "inserted" in rawStats ? rawStats : null;
     // `failed` counts cell-level parse errors, not skipped rows — every row
     // is still inserted or updated even when one of its cells failed to
     // parse (the bad cell is just left empty). Row-completion progress is
@@ -163,7 +167,7 @@ export class CsvService {
       id: job.id,
       status: job.status as ImportJobStatus["status"],
       progressPercent,
-      stats: stats ?? undefined,
+      stats: rawStats ?? undefined,
       errorReportUrl: job.error_report_path ? `/api/imports/${job.id}/error-report` : undefined,
     };
   }
@@ -417,6 +421,22 @@ export class CsvService {
   }
 
   private async createTableFromMappings(baseId: string, name: string, mappings: ImportColumnMapping[]): Promise<string> {
+    // Checked up front rather than left to surface as a raw Postgres unique-
+    // constraint violation — that error reached a user verbatim once already
+    // (a stray leftover table happened to share the wizard's old hardcoded
+    // default name, and every retry failed the same opaque way with no
+    // indication why). A clear message here is cheap; a confusing crash is not.
+    const existing = await this.db.db
+      .selectFrom("tables")
+      .select("id")
+      .where("base_id", "=", baseId)
+      .where("name", "=", name)
+      .where("deleted_at", "is", null)
+      .executeTakeFirst();
+    if (existing) {
+      throw new BadRequestException(`A table named "${name}" already exists in this base — choose a different name.`);
+    }
+
     return this.db.runInTransaction(async () => {
       const tableId = makeId("table");
       const max = await this.db.db

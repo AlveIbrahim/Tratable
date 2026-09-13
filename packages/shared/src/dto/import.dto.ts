@@ -34,15 +34,26 @@ export interface ImportAnalysis {
   delimiter: string;
 }
 
+export interface ImportJobStats {
+  inserted: number;
+  updated: number;
+  failed: number;
+  totalRows: number;
+}
+
+/** A job that throws before any row processing starts (a name collision,
+ * a bad mapping) never has row counts to report — this is the shape
+ * startExecute's catch handler persists in that case, distinct from
+ * ImportJobStats. The UI must check which one it got, not assume success
+ * shape and render blank fields for a message it never looked at. */
+export interface ImportJobError {
+  error: string;
+}
+
 export interface ImportJobStatus {
   id: string;
   status: "uploaded" | "analyzing" | "analyzed" | "running" | "completed" | "failed";
   progressPercent: number;
-  stats?: {
-    inserted: number;
-    updated: number;
-    failed: number;
-    totalRows: number;
-  };
+  stats?: ImportJobStats | ImportJobError;
   errorReportUrl?: string;
 }

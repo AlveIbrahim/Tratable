@@ -63,6 +63,8 @@ export function ImportWizard({
     if (isDone && step === "running") setStep("done");
   }, [isDone, step]);
 
+  const [uploadedFileName, setUploadedFileName] = useState("");
+
   async function onFileSelected() {
     const file = fileRef.current?.files?.[0];
     if (!file) return;
@@ -70,10 +72,29 @@ export function ImportWizard({
     try {
       const res = await upload.mutateAsync({ baseId, file });
       setJobId(res.id);
+      setUploadedFileName(res.originalName);
       setStep("mapping");
     } catch (e) {
       setError(e instanceof Error ? e.message : "Upload failed");
     }
+  }
+
+  /** A name colliding with an existing table is exactly what caused the
+   * blank-error "Import failed" dialog: the wizard used to always suggest
+   * the same literal "Imported table" string, and a base that already had
+   * a table by that name (including a leftover test one, in the case that
+   * surfaced this) made every single import attempt fail identically with
+   * no visible reason. Deriving the suggestion from the file's own name,
+   * and nudging past any collision, makes a repeat collision far less
+   * likely — though the backend's own pre-check (see csv.service.ts) is
+   * the actual guarantee, not this. */
+  function suggestTableName(fileName: string): string {
+    const base = fileName.replace(/\.[^./]+$/, "").replace(/[_-]+/g, " ").trim() || "Imported table";
+    const existingNames = new Set(tables.map((t) => t.name));
+    if (!existingNames.has(base)) return base;
+    let n = 2;
+    while (existingNames.has(`${base} ${n}`)) n++;
+    return `${base} ${n}`;
   }
 
   // Seed mappings from the analysis once it arrives.
@@ -88,7 +109,7 @@ export function ImportWizard({
         fieldType: c.inferredType,
       })),
     );
-    if (!newTableName) setNewTableName("Imported table");
+    if (!newTableName) setNewTableName(suggestTableName(uploadedFileName));
   }
 
   function updateMapping(idx: number, patch: Partial<ImportColumnMapping>) {
@@ -286,7 +307,10 @@ export function ImportWizard({
               <p className={status.status === "failed" ? "text-red-600" : ""}>
                 {status.status === "failed" ? "Import failed." : "Import complete."}
               </p>
-              {status.stats && (
+              {status.stats && "error" in status.stats && (
+                <p className="rounded bg-red-50 px-3 py-2 text-sm text-red-700">{status.stats.error}</p>
+              )}
+              {status.stats && "inserted" in status.stats && (
                 <ul className="text-[var(--color-muted)]">
                   <li>Inserted: {status.stats.inserted}</li>
                   <li>Updated: {status.stats.updated}</li>
@@ -310,6 +334,14 @@ export function ImportWizard({
               className="rounded bg-[var(--color-accent)] px-4 py-1.5 text-sm font-medium text-[var(--color-accent-fg)] disabled:opacity-50"
             >
               Import
+            </button>
+          )}
+          {step === "done" && status?.status === "failed" && (
+            <button
+              onClick={() => setStep("mapping")}
+              className="rounded border border-[var(--color-border)] px-4 py-1.5 text-sm font-medium"
+            >
+              Back to mapping
             </button>
           )}
           {step === "done" && (

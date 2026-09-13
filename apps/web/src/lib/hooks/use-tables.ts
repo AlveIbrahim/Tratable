@@ -33,3 +33,11 @@ export function useCreateTable(baseId: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["tables", baseId] }),
   });
 }
+
+export function useDeleteTable(baseId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (tableId: string) => api.delete(`/tables/${tableId}`),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tables", baseId] }),
+  });
+}
